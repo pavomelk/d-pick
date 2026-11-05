@@ -1,8 +1,8 @@
 # Requirements — Incremental Segmented Date Parser
 
 Status: **draft v0.2** — v0.1 (from `problem_statement.md`) revised against the clarifications in §10;
-OQ-1 and OQ-3 are decided, OQ-2 and OQ-4 are still open (§11).
-Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C11 (§10).
+OQ-1, OQ-2 and OQ-3 are decided, OQ-4 is still open (§11).
+Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C12 (§10).
 Notation: **C#** clarification (§10) · **AC-#** acceptance scenario (§5) · **OQ-#** open question (§11) · **A-#** assumption (§11).
 
 Priorities: **MUST** = needed for the first working version · **SHOULD** = expected, unless clearly too costly · **MAY** = optional.
@@ -38,7 +38,8 @@ Non-goals for v1
 - Replacing or restyling the native date picker.
 - Rewriting the text field *while the user is typing* (the typed value stays exactly as typed; rewriting
   happens only on commit, FR-17/FR-24).
-- Year-first parsing of typed input (`YYYY-MM-DD` is not read as a year-first date; see OQ-2).
+- Year-first dates: a typed `YYYY-MM-DD` is not read as a year-first date, and `textFormat` cannot write
+  that form (OQ-2, A-4, FR-24).
 - Mobile-specific keypads or native date-keyboard hints.
 
 ## 3. Terms
@@ -200,8 +201,9 @@ Non-goals for v1
   numeric (`DD`, `MM`), 3 = abbreviated month name (`MMM`), 4 = full month name (`MMMM`), `YY` = 2-digit
   year, `YYYY` = 4-digit year. Separators are copied literally; anything else in the pattern is a
   `TypeError` at construction. Without `textFormat`, FR-17's display text is used. The prediction in the
-  feedback always uses FR-20's forms, never the pattern. Patterns whose value would not re-parse are not
-  supported in v1 (OQ-2).
+  feedback always uses FR-20's forms, never the pattern. Year-first patterns (`YYYY-MM-DD`, `YY/MM/DD`)
+  are rejected with a `TypeError` at construction (OQ-2): the value they write would not re-parse
+  (FR-17), and users are not expected to type a year-first date (A-4).
 - **FR-25 (MUST)** When the text field loses focus (blur) with a value that is not unambiguously
   interpreted — i.e. status other than `complete` — the text field is reset to the `defaultValue` option
   and the date input is cleared, so a half-typed date never stays behind looking like a value (C11,
@@ -296,7 +298,9 @@ nothing, because the year could still be 2020…2029; after `0` the value `25 Ma
 
 **AC-17 — `textFormat` (C4)**: with `textFormat: 'd-m-YYYY'`, a picker selection of 2024-05-25 leaves
 `25-5-2024` in the text field while the feedback still reads `25 May 2024`, and re-typing/confirming
-`25/5/24` rewrites the field to `25-5-2024`; that value re-parses to `complete`, 2024-05-25.
+`25/5/24` rewrites the field to `25-5-2024`; that value re-parses to `complete`, 2024-05-25. With
+`textFormat: 'YYYY-MM-DD'` construction throws a `TypeError`, so the field never holds a value the
+component cannot read back.
 
 **AC-18 — blur resets an unconfirmed value (C11)**: type `25 Sep` (status `partial`) and Tab away: the
 text field is cleared (`defaultValue` undefined) and the date input too. Typing `25524` and tabbing away
@@ -336,15 +340,15 @@ result to `5 May 1905 (2 of 2)`, the text field is untouched, and `Enter` then c
 6. Character blocking and paste sanitising (FR-2) in the DOM layer; unmatched letters → `invalid`.
 7. Status vocabulary and feedback text (FR-20, FR-21), ellipsis positions, selected-reading marker.
 8. Reading list order and ArrowDown/ArrowUp cycling, cap (FR-15); Enter confirmation matrix (FR-16).
-9. `textFormat` rendering for each token and round-trip re-parse (FR-24); blur reset with and without
-   `defaultValue` (FR-25).
+9. `textFormat` rendering for each token and round-trip re-parse, year-first pattern → `TypeError`
+   (FR-24); blur reset with and without `defaultValue` (FR-25).
 10. Page binding: `input`, paste, deletion, completion → date input value, picker → reading and text,
     no write loops, `destroy()` removes listeners (FR-1, FR-26 … FR-28).
 
 ## 8. Out of scope for this version
 
-- Year-first typed input (`2024-05-25` typed by the user), and therefore year-first `textFormat` patterns
-  (OQ-2), era/BC, week numbers.
+- Year-first typed input (`2024-05-25` typed by the user) and year-first `textFormat` patterns, which
+  FR-24 rejects (OQ-2, A-4); era/BC, week numbers.
 - Locales other than English, free-form text, time of day.
 - Reformatting or correcting the value while typing (commit-time conversion is in scope, FR-24).
 - Persistence, form serialisation helpers, framework wrappers, a custom picker.
@@ -380,6 +384,7 @@ result to `5 May 1905 (2 of 2)`, the text field is untouched, and `Enter` then c
 | C9  | "Yes, invalid characters should be blocked."                                                                                                  | Disallowed characters are prevented on input and stripped from pasted text; letters stay allowed for month names                  | FR-2, AC-14                 |
 | C10 | "Yes, factory function."                                                                                                                      | Factory over plain DOM, no custom element, no shadow DOM                                                                          | FR-29                       |
 | C11 | "If user leaves control without unambigously interpreted values, the value should be set to default, which is 'undefined', unless specified explicity as an option parameter" | Blur resets anything that is not `complete` to `defaultValue` (default: cleared) and clears the date input                        | FR-25, AC-18                |
+| C12 | "It should be assumed that users are not expected to enter `YYYY-MM-DD` format."                                                          | Year-first entry is not expected: it is not parsed, and `textFormat` rejects year-first patterns with a `TypeError` so the field always re-parses | FR-24, A-4, OQ-2            |
 
 ## 11. Assumptions and questions
 
@@ -390,12 +395,14 @@ Assumptions (implemented as stated; say so if one is wrong)
 - **A-2** "Reasonably small number of readings" is a cap (default 20); above it ArrowDown keeps its native
   effect and the list is still exposed programmatically.
 - **A-3** `defaultValue` is written verbatim into the text field (normally the empty string).
+- **A-4** Users are not expected to enter a year-first date, so no year-first entry is parsed and no
+  year-first `textFormat` is offered; whatever the field holds re-parses to the reading shown (C12, OQ-2).
 
 Questions — answered ones are kept here so the FR references stay stable
 
 | id   | question                                                                                                                                                                                                                                    | decision                                                                                                  | status   |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------- |
 | OQ-1 | Is the little-endian preference really absolute? Applying FR-12 strictly means `52` shows `5 February …` and `1225` completes as `1 February 2025`, never `May 2…` / `December 25…`. Or should middle-endian come back whenever its reading is *more* plausible? | Keep it absolute: preference is not a plausibility vote (the statement says "prefer", and C2 distrusts the examples) | decided  |
-| OQ-2 | `textFormat` with a year-first pattern such as `YYYY-MM-DD` writes a value the parser cannot read back (year-first input is out of scope). Support year-first patterns (and year-first parsing of committed values), or reject such patterns? | Reject year-first patterns with a `TypeError` in v1; keep the field re-parseable (FR-17)                  | open     |
+| OQ-2 | `textFormat` with a year-first pattern such as `YYYY-MM-DD` writes a value the parser cannot read back (year-first input is out of scope). Support year-first patterns (and year-first parsing of committed values), or reject such patterns? | Reject; no year-first entry is expected (A-4), a year-first pattern would break FR-17, so `TypeError` at construction | decided  |
 | OQ-3 | (C7 return) What should the feedback explain besides the date? Option A: just the reading and status (`25 May …`). Option B: also why alternatives were dropped (`02-05 dropped: a 1-digit year is impossible`). Option C: B, but only on request (a details element / debug flag). | **A** — reading and status only; the structured result (FR-22) carries the detail, and the live region stays quiet | decided  |
 | OQ-4 | C11's "default" — is it the text field's value (reset to `defaultValue` string, as specified in FR-25) or only the component's resolved date (text left as typed)?                                                                          | Reset the text field and clear the date input, so no half-typed date is left looking authoritative      | open     |
