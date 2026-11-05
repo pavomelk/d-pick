@@ -1,8 +1,8 @@
 # Requirements — Incremental Segmented Date Parser
 
 Status: **draft v0.2** — v0.1 (from `problem_statement.md`) revised against the clarifications in §10;
-OQ-1, OQ-2 and OQ-3 are decided, OQ-4 is still open (§11).
-Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C12 (§10).
+OQ-1 … OQ-4 are all decided (§11).
+Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C13 (§10).
 Notation: **C#** clarification (§10) · **AC-#** acceptance scenario (§5) · **OQ-#** open question (§11) · **A-#** assumption (§11).
 
 Priorities: **MUST** = needed for the first working version · **SHOULD** = expected, unless clearly too costly · **MAY** = optional.
@@ -207,7 +207,7 @@ Non-goals for v1
 - **FR-25 (MUST)** When the text field loses focus (blur) with a value that is not unambiguously
   interpreted — i.e. status other than `complete` — the text field is reset to the `defaultValue` option
   and the date input is cleared, so a half-typed date never stays behind looking like a value (C11,
-  AC-18). `defaultValue` defaults to `undefined`, which clears the field. A value that is already
+  OQ-4, AC-18). `defaultValue` defaults to `undefined`, which clears the field. A value that is already
   `complete`, and an empty field, are left alone.
 
 ### 4.8 Integration with `<input type="date">`
@@ -217,7 +217,11 @@ Non-goals for v1
   replace, hide or rebuild the date input, and MUST NOT ship its own picker.
 - **FR-27 (MUST)** Keep both fields consistent: a commit (FR-17) writes the date input; a native-picker
   change presents that date as the current reading and fills the text input per FR-17/FR-24; programmatic
-  writes must not loop, and an unconfirmed `ambiguous` or `partial` reading never writes the date input.
+  writes must not loop. The date input carries a date only while the text resolves to exactly one: it is
+  filled when the status becomes `complete` and cleared as soon as the status becomes anything else
+  (further typing, deletion, `ambiguous`, `out-of-range`, `invalid`, the blur reset of FR-25), so a
+  resolved date never sits beside text it no longer matches (C13, OQ-4, AC-21). The text field is never
+  rewritten while typing (FR-5).
 - **FR-28 (SHOULD)** The date input's `min`/`max` are kept in sync with the resolved range (omitted for
   an absent bound; a frozen `'now'` bound yields a fixed date), and the host gets a way to open the
   native picker on request.
@@ -313,6 +317,11 @@ result to `5 May 1905 (2 of 2)`, the text field is untouched, and `Enter` then c
 **AC-20 — `'now'` is frozen (C8)**: a component created on 2026-11-04 still rejects 2026-11-05 as
 `out-of-range` on 2026-11-06 (clock injected in the test), and `max` on the date input stays 2026-11-04.
 
+**AC-21 — an unresolved value clears the date input (OQ-4)**: confirm 2024-05-25, then edit the text to
+`25 May 202` (`partial`): the date input is emptied immediately while the typed text stays exactly as
+keyed; completing it back to `25 May 2024` refills the date input with 2024-05-25. Deleting everything
+leaves both fields empty.
+
 ## 6. Non-functional requirements
 
 - **NFR-1** No runtime dependency; plain ES modules, no transpiling, no bundling required to use the
@@ -342,8 +351,9 @@ result to `5 May 1905 (2 of 2)`, the text field is untouched, and `Enter` then c
 8. Reading list order and ArrowDown/ArrowUp cycling, cap (FR-15); Enter confirmation matrix (FR-16).
 9. `textFormat` rendering for each token and round-trip re-parse, year-first pattern → `TypeError`
    (FR-24); blur reset with and without `defaultValue` (FR-25).
-10. Page binding: `input`, paste, deletion, completion → date input value, picker → reading and text,
-    no write loops, `destroy()` removes listeners (FR-1, FR-26 … FR-28).
+10. Page binding: `input`, paste, deletion, completion → date input value, editing back to a non-`complete`
+    status → date input cleared (FR-27), picker → reading and text, no write loops, `destroy()` removes
+    listeners (FR-1, FR-26 … FR-28).
 
 ## 8. Out of scope for this version
 
@@ -385,6 +395,7 @@ result to `5 May 1905 (2 of 2)`, the text field is untouched, and `Enter` then c
 | C10 | "Yes, factory function."                                                                                                                      | Factory over plain DOM, no custom element, no shadow DOM                                                                          | FR-29                       |
 | C11 | "If user leaves control without unambigously interpreted values, the value should be set to default, which is 'undefined', unless specified explicity as an option parameter" | Blur resets anything that is not `complete` to `defaultValue` (default: cleared) and clears the date input                        | FR-25, AC-18                |
 | C12 | "It should be assumed that users are not expected to enter `YYYY-MM-DD` format."                                                          | Year-first entry is not expected: it is not parsed, and `textFormat` rejects year-first patterns with a `TypeError` so the field always re-parses | FR-24, A-4, OQ-2            |
+| C13 | "Answer to OQ-2: Reset text field and the date input. Whenever the date can not be resolved from user input is should be cleared." (labelled OQ-2, but it answers OQ-4/C11) | Both fields reset on blur, and the date input is emptied as soon as the text no longer resolves to exactly one date | FR-25, FR-27, OQ-4, AC-21   |
 
 ## 11. Assumptions and questions
 
@@ -394,7 +405,8 @@ Assumptions (implemented as stated; say so if one is wrong)
   `DD-MM-YY` from C4 work; letters are the only token characters, so `T`/`Z`-style literals are rejected.
 - **A-2** "Reasonably small number of readings" is a cap (default 20); above it ArrowDown keeps its native
   effect and the list is still exposed programmatically.
-- **A-3** `defaultValue` is written verbatim into the text field (normally the empty string).
+- **A-3** `defaultValue` is written verbatim into the text field (normally the empty string); if it
+  happens to be a complete date, the date input is filled from it per FR-27, so the fields stay consistent.
 - **A-4** Users are not expected to enter a year-first date, so no year-first entry is parsed and no
   year-first `textFormat` is offered; whatever the field holds re-parses to the reading shown (C12, OQ-2).
 
@@ -405,4 +417,4 @@ Questions — answered ones are kept here so the FR references stay stable
 | OQ-1 | Is the little-endian preference really absolute? Applying FR-12 strictly means `52` shows `5 February …` and `1225` completes as `1 February 2025`, never `May 2…` / `December 25…`. Or should middle-endian come back whenever its reading is *more* plausible? | Keep it absolute: preference is not a plausibility vote (the statement says "prefer", and C2 distrusts the examples) | decided  |
 | OQ-2 | `textFormat` with a year-first pattern such as `YYYY-MM-DD` writes a value the parser cannot read back (year-first input is out of scope). Support year-first patterns (and year-first parsing of committed values), or reject such patterns? | Reject; no year-first entry is expected (A-4), a year-first pattern would break FR-17, so `TypeError` at construction | decided  |
 | OQ-3 | (C7 return) What should the feedback explain besides the date? Option A: just the reading and status (`25 May …`). Option B: also why alternatives were dropped (`02-05 dropped: a 1-digit year is impossible`). Option C: B, but only on request (a details element / debug flag). | **A** — reading and status only; the structured result (FR-22) carries the detail, and the live region stays quiet | decided  |
-| OQ-4 | C11's "default" — is it the text field's value (reset to `defaultValue` string, as specified in FR-25) or only the component's resolved date (text left as typed)?                                                                          | Reset the text field and clear the date input, so no half-typed date is left looking authoritative      | open     |
+| OQ-4 | C11's "default" — is it the text field's value (reset to `defaultValue` string, as specified in FR-25) or only the component's resolved date (text left as typed)?                                                                          | Reset both: the text field to `defaultValue` on blur, and the date input emptied whenever the text does not resolve to exactly one date, not only on blur | decided  |
