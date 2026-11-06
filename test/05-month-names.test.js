@@ -1,9 +1,10 @@
 // §7 group 5 — month names, abbreviations, prefixes and ambiguous prefixes
-// (FR-3, FR-9, AC-12).
+// (FR-3, FR-9, FR-14, AC-12, AC-23).
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { selectReading } from '../src/format.js';
 import { parse } from '../src/parse.js';
 import { base } from './helpers/options.js';
 
@@ -35,14 +36,57 @@ test('FR-3: letters a run cannot resolve make the value invalid', () => {
   assert.deepEqual(p('xyz').readings, []);
 });
 
-test('AC-12: a prefix matching two months stays undetermined while the year is open', () => {
+test('AC-12/C25: a prefix matching two months is partial while the year is open', () => {
   const result = p('25 ju');
-  assert.equal(result.status, 'undetermined');
-  assert.equal(result.text, 'Not enough information');
+  assert.equal(result.status, 'partial');
+  assert.equal(result.text, '25 June …');
   assert.deepEqual(
     result.readings.map((reading) => reading.month),
     [6, 7],
   );
+});
+
+test('AC-23: a unique month prefix is presented immediately', () => {
+  const november = p('N');
+  assert.equal(november.status, 'partial');
+  assert.equal(november.text, 'November');
+  assert.equal(november.date, null);
+
+  const withDay = p('N 25');
+  assert.equal(withDay.status, 'partial');
+  assert.equal(withDay.text, 'November 25 …');
+  assert.equal(p('N 25 2024').status, 'complete');
+  assert.equal(p('N 25 2024').text, 'November 25, 2024');
+});
+
+test('AC-23/C25: J presents June, July, then January', () => {
+  const result = p('J');
+  assert.equal(result.status, 'partial');
+  assert.equal(result.text, 'June');
+  assert.deepEqual(
+    result.readings.map((reading) => reading.month),
+    [6, 7, 1],
+  );
+
+  const july = selectReading(result, 1);
+  assert.equal(july.index, 1);
+  assert.equal(july.text, 'July (2 of 3)');
+  assert.equal(july.date, null);
+
+  const january = selectReading(result, 2);
+  assert.equal(january.index, 2);
+  assert.equal(january.text, 'January (3 of 3)');
+});
+
+test('AC-23/C25: Ju keeps June preferred and July as the next reading', () => {
+  const result = p('Ju 25');
+  assert.equal(result.status, 'partial');
+  assert.equal(result.text, 'June 25 …');
+  assert.deepEqual(
+    result.readings.map((reading) => reading.month),
+    [6, 7],
+  );
+  assert.equal(selectReading(result, 1).text, 'July 25 … (2 of 2)');
 });
 
 test('FR-9: once the year is known the two months are complete alternatives', () => {

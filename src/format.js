@@ -19,6 +19,7 @@ export const MONTH_NAMES = [
 export const MONTH_ABBREVIATIONS = MONTH_NAMES.map((name) => name.slice(0, 3));
 
 export const NOT_ENOUGH = 'Not enough information';
+export const OUT_OF_RANGE = 'Date out of range';
 
 const ELLIPSIS = '…';
 const MESSAGE_STATUSES = new Set(['undetermined', 'invalid', 'out-of-range']);
@@ -33,6 +34,11 @@ export function formatReading(reading) {
       : reading.yearPrefix
         ? `${reading.yearPrefix}${ELLIPSIS}`
         : ELLIPSIS;
+
+  // A month determined on its own is shown alone (FR-20).
+  if (reading.month !== null && reading.day === null && reading.year === null && !reading.yearPrefix) {
+    return monthText;
+  }
 
   if (reading.endianness === 'middle') {
     return reading.year === null && !reading.yearPrefix
@@ -138,11 +144,12 @@ export function selectReading(result, index) {
   const reading = readings[selected];
   const marker = selected > 0 ? ` (${selected + 1} of ${readings.length})` : '';
   const isMessage = MESSAGE_STATUSES.has(result.status);
+  const message = result.status === 'out-of-range' ? OUT_OF_RANGE : NOT_ENOUGH;
 
   return {
     ...result,
     index: selected,
-    text: isMessage && selected === 0 ? NOT_ENOUGH : `${formatReading(reading)}${marker}`,
+    text: isMessage && selected === 0 ? message : `${formatReading(reading)}${marker}`,
     date: reading.complete ? reading.iso : null,
     endianness: reading.endianness,
     parts: { day: reading.day, month: reading.month, year: reading.year },

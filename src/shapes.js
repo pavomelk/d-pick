@@ -36,13 +36,18 @@ export function readingsFor(scanned, range) {
   return readings;
 }
 
+// A bare `J` is ambiguous between January, June and July. The clarified order
+// is June, July, January (C26); longer prefixes stay in calendar order.
+const MONTH_ORDER_OVERRIDES = new Map([['j', [6, 7, 1]]]);
+
 function monthsMatching(text) {
   const prefix = text.toLowerCase();
   const months = [];
   MONTH_NAMES.forEach((name, index) => {
     if (name.toLowerCase().startsWith(prefix)) months.push(index + 1);
   });
-  return months;
+  const override = MONTH_ORDER_OVERRIDES.get(prefix);
+  return override ? override.filter((month) => months.includes(month)) : months;
 }
 
 function validDay(value) {
@@ -130,25 +135,32 @@ function readSegments(segments, endianness, range, spill) {
 
   const base = { endianness, day, spans, segmentCount: segments.length };
 
-  // Missing a whole part: exposed so "not enough information" has something to
-  // show, but never a date (FR-14).
+  // Missing a whole part: exposed so the best partial reading can be shown,
+  // but never as a date (FR-14). A letter run can already determine the month
+  // even when the day is missing, and every matching month stays walkable.
   if (day === null || months === null) {
-    return [
-      {
+    return (months || [null]).map((month, monthRank) => {
+      const reading = {
         ...base,
-        month: months ? months[0] : null,
+        month,
         complete: false,
         year: null,
         yearPrefix: null,
         iso: null,
-      },
-    ];
+      };
+      Object.defineProperty(reading, 'monthRank', { value: monthRank, enumerable: false });
+      return reading;
+    });
   }
 
   const readings = [];
-  for (const month of months) {
-    readings.push(...readingsForYear({ base, month, yearDigits, range }));
-  }
+  months.forEach((month, monthRank) => {
+    for (const reading of readingsForYear({ base, month, yearDigits, range })) {
+      // Internal ordering only: not part of the public reading shape.
+      Object.defineProperty(reading, 'monthRank', { value: monthRank, enumerable: false });
+      readings.push(reading);
+    }
+  });
   return readings;
 }
 

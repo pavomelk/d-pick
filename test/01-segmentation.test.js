@@ -61,6 +61,16 @@ test('AC-6 … AC-10: five digits resolve to a little-endian date', () => {
   assert.equal(five.endianness, 'little');
 });
 
+test('AC-25: 05 is day 5 until the year position', () => {
+  const leading = p('05');
+  assert.equal(leading.status, 'undetermined');
+  assert.equal(leading.text, 'Not enough information');
+
+  const complete = p('25 5 05');
+  assert.equal(complete.status, 'complete');
+  assert.equal(complete.date, '2005-05-25');
+});
+
 test('FR-7/FR-22: the structured result exposes parts and digit spans', () => {
   const result = p('25524');
   assert.deepEqual(result.parts, { day: 25, month: 5, year: 2024 });

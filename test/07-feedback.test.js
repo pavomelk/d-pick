@@ -68,17 +68,24 @@ test('FR-21: an empty value has no reading at all', () => {
   assert.deepEqual(empty.readings, []);
 });
 
-test('FR-20: no usable reading is reported as "Not enough information"', () => {
-  for (const [value, options] of [
-    ['5', undefined],
-    ['25 ju', undefined],
-    ['255/24', undefined],
-    ['31122019', { range: { from: '2020-01-01', to: '2020-12-31' } }],
-  ]) {
-    const result = p(value, options);
+test('FR-20: undetermined and invalid values are "Not enough information"', () => {
+  for (const value of ['5', '255/24']) {
+    const result = p(value);
     assert.equal(result.text, 'Not enough information', value);
     assert.equal(result.date, null, value);
   }
+});
+
+test('FR-20/AC-11: an out-of-range value says so and keeps no date', () => {
+  const result = p('31122019', { range: { from: '2020-01-01', to: '2020-12-31' } });
+  assert.equal(result.status, 'out-of-range');
+  assert.equal(result.text, 'Date out of range');
+  assert.equal(result.date, null);
+});
+
+test('FR-20/C25: a determined month with no other part is shown alone', () => {
+  assert.equal(p('N').text, 'November');
+  assert.equal(p('J').text, 'June');
 });
 
 test('AC-7/FR-14: undetermined keeps its surviving reading exposed', () => {

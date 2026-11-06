@@ -40,7 +40,7 @@ test('AC-11: a well-formed date outside the range is out-of-range, not invalid',
   const excluded = p('31122019', R_2020);
   assert.equal(excluded.status, 'out-of-range');
   assert.equal(excluded.date, null);
-  assert.equal(excluded.text, 'Not enough information');
+  assert.equal(excluded.text, 'Date out of range');
   assert.deepEqual(excluded.readings, []);
 
   const included = p('311220', R_2020);

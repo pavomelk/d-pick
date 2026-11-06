@@ -42,6 +42,17 @@ test('FR-15: ArrowDown/ArrowUp walk the list, wrap, and never touch the text', (
   assert.equal(feedback.textContent, '5 May 2005');
 });
 
+test('C25: ArrowDown walks an ambiguous month prefix from June to July', () => {
+  const { textInput, dateInput, feedback } = setup();
+  textInput.type('J');
+  assert.equal(feedback.textContent, 'June');
+
+  textInput.key('ArrowDown');
+  assert.equal(feedback.textContent, 'July (2 of 3)');
+  assert.equal(textInput.value, 'J');
+  assert.equal(dateInput.value, '');
+});
+
 test('FR-15: navigation is off above maxReadings, so the key stays native', () => {
   const { textInput, feedback } = setup({ ...R_1900, maxReadings: 1 });
   textInput.type('5/5/05');
@@ -113,8 +124,9 @@ test('AC-16: a short year is read, an unfinished one is not invented', () => {
   assert.equal(started.dateInput.value, '');
 });
 
-test('FR-16: Enter confirms nothing for undetermined, invalid or out-of-range input', () => {
+test('FR-16: Enter confirms nothing when no single complete date can be formed', () => {
   const cases = [
+    ['J', undefined],
     ['25 ju', undefined],
     ['255/24', undefined],
     ['31122019', { range: { from: '2020-01-01', to: '2020-12-31' } }],

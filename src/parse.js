@@ -5,7 +5,7 @@
 // `now` is resolved once per call, so a caller can freeze it.
 
 import { isoOf, parseIsoDate, todayIso } from './dates.js';
-import { NOT_ENOUGH, selectReading } from './format.js';
+import { NOT_ENOUGH, OUT_OF_RANGE, selectReading } from './format.js';
 import { scan } from './scan.js';
 import { readingsFor } from './shapes.js';
 
@@ -61,6 +61,9 @@ function compareReadings(left, right, nowYear) {
   }
 
   if (left.segmentCount !== right.segmentCount) return left.segmentCount - right.segmentCount;
+  if (left.monthRank !== right.monthRank) {
+    return (left.monthRank || 0) - (right.monthRank || 0);
+  }
   if (left.month !== right.month) return (left.month || 0) - (right.month || 0);
   if (left.day !== right.day) return (left.day || 0) - (right.day || 0);
   if (left.year !== right.year) return (left.year || 0) - (right.year || 0);
@@ -122,10 +125,14 @@ export function parse(value, options = {}) {
     } else if (readings.length === 1) {
       const only = readings[0];
       if (only.complete) status = 'complete';
-      else if (only.day !== null && only.month !== null) status = 'partial';
+      else if (only.month !== null) status = 'partial';
       else status = 'undetermined';
+    } else if (readings.every((reading) => reading.complete)) {
+      status = 'ambiguous';
     } else {
-      status = readings.every((reading) => reading.complete) ? 'ambiguous' : 'undetermined';
+      // A determined month is enough to present the best partial reading;
+      // undetermined means no presented reading can name the month (FR-14).
+      status = readings.some((reading) => reading.month !== null) ? 'partial' : 'undetermined';
     }
   }
 
@@ -145,7 +152,9 @@ export function parse(value, options = {}) {
   };
 
   if (status === 'empty') return { ...base, text: '' };
-  if (visible.length === 0) return { ...base, text: NOT_ENOUGH };
+  if (visible.length === 0) {
+    return { ...base, text: status === 'out-of-range' ? OUT_OF_RANGE : NOT_ENOUGH };
+  }
 
   return selectReading(base, 0);
 }
