@@ -95,17 +95,22 @@ test('AC-15: no year is proposed when it would fall outside the range', () => {
   assert.equal(textInput.value, '25 Sep');
 });
 
-test('AC-16: Enter never invents a year that has been started', () => {
-  const { textInput, confirmed, dateInput } = setup();
+test('AC-16: a short year is read, an unfinished one is not invented', () => {
+  const { textInput, confirmed, dateInput, feedback } = setup();
+  // `2` is the year 02, so this is already a complete date and Enter takes it.
   textInput.type('25 May 2');
+  assert.equal(feedback.textContent, '25 May 2002');
   textInput.key('Enter');
-  assert.deepEqual(confirmed, []);
-  assert.equal(textInput.value, '25 May 2');
-  assert.equal(dateInput.value, '');
+  assert.deepEqual(confirmed, ['2002-05-25']);
+  assert.equal(dateInput.value, '2002-05-25');
 
-  textInput.type('0');
-  textInput.key('Enter');
-  assert.deepEqual(confirmed, ['2020-05-25']);
+  // `202` can only be a prefix (no in-range year ends in 202): Enter does nothing.
+  const started = setup();
+  started.textInput.type('25 May 202');
+  started.textInput.key('Enter');
+  assert.deepEqual(started.confirmed, []);
+  assert.equal(started.textInput.value, '25 May 202');
+  assert.equal(started.dateInput.value, '');
 });
 
 test('FR-16: Enter confirms nothing for undetermined, invalid or out-of-range input', () => {
@@ -140,8 +145,8 @@ test('FR-16: a fresh text change puts the selection back on the preferred readin
   assert.equal(feedback.textContent, '5 May 1905 (2 of 2)');
   textInput.backspace();
   assert.equal(textInput.value, '5/5/0');
-  // `0` reaches both the 1900s and the 2000s here, so the completions share
-  // no digit and nothing is written after the ellipsis (FR-20).
-  assert.equal(feedback.textContent, '5 May …');
-  assert.equal(feedback.textContent.includes('of 2'), false);
+  // `0` is the year 00 → 2000, so the value is complete again on one reading
+  // and the marker of the previous selection is gone.
+  assert.equal(feedback.textContent, '5 May 2000');
+  assert.equal(feedback.textContent.includes('of '), false);
 });

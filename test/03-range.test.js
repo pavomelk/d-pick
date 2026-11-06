@@ -71,13 +71,14 @@ test('FR-11: an unfinished year survives only while a completion is in range', (
   assert.equal(oneYear.status, 'partial');
   assert.equal(oneYear.text, '25 May 202…');
 
-  // A one-digit year is a two-digit-year prefix (FR-10), so `9` reaches the
-  // 1990s here and the range supplies the century.
+  // A one-digit year is a year number (C17): `9` is 1999 here, because the
+  // range leaves no other year ending in 9.
   const nineteenNineties = p('25 May 9', {
     range: { from: '1990-01-01', to: '2010-12-31' },
   });
-  assert.equal(nineteenNineties.status, 'partial');
-  assert.equal(nineteenNineties.text, '25 May 199…');
+  // `9` is the year 09, so the only year in 1990…2010 ending in 09 is 2009.
+  assert.equal(nineteenNineties.status, 'complete');
+  assert.equal(nineteenNineties.date, '2009-05-25');
 
   const beforeTwoThousands = p('25 May 2', {
     range: { from: '1972-02-05', to: '1999-12-31' },

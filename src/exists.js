@@ -35,6 +35,31 @@ export function centuryYears(twoDigits, range) {
   return years;
 }
 
+/**
+ * Every in-range year whose decimal form *ends* with `digits` — what a short
+ * year run can be read as (FR-13, C17). `5` gives …, 1995, 2005, 2025 … so the
+ * preferred one is the closest to today, and `952` reaches 1952 rather than
+ * 2952.
+ */
+export function suffixYears(digits, range) {
+  if (!digits || digits.length > 3) return [];
+  // One digit is the second digit of a two-digit year, so `5` means 05 and the
+  // step is a century, not a decade: 1905, 2005, 2105 (C17).
+  const modulus = 10 ** Math.max(2, digits.length);
+  const value = Number(digits);
+  if (!Number.isFinite(value) || value >= modulus) return [];
+
+  const { from, to } = yearBounds(range);
+  const aligned = (from % modulus + modulus) % modulus;
+  const offset = (value - aligned + modulus) % modulus;
+  const years = [];
+
+  for (let year = from + offset; year <= to; year += modulus) {
+    if (year >= MIN_YEAR && year <= MAX_YEAR) years.push(year);
+  }
+  return years;
+}
+
 /** Every four-digit year of the range whose decimal form starts with
  * `digits` — used for an unfinished year (1 or 3 digits, FR-10). */
 export function completionYears(digits, range) {

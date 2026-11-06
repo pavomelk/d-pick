@@ -19,17 +19,21 @@ test('FR-20: a complete reading is shown with month names and its order', () => 
   assert.equal(middle.endianness, 'middle');
 });
 
-test('FR-20: a missing part shows an ellipsis after the preceding separator', () => {
-  assert.equal(p('525').text, 'May 25 …');
+test('FR-20: a missing part shows an ellipsis in its position', () => {
+  assert.equal(p('5/25').text, 'May 25 …');
   assert.equal(p('255').text, '25 May …');
   assert.equal(p('25 sep').text, '25 September …');
 });
 
 test('FR-20: an unfinished year shows the prefix its completions share', () => {
-  assert.equal(p('5252').text, 'May 25, 202…');
-  assert.equal(p('2552').text, '25 May 202…');
-  assert.equal(p('25 May 2').text, '25 May 202…');
+  // Only when no in-range year can end with the run: `202` would have to be
+  // 1202 or 2202, so the run is still being typed.
   assert.equal(p('25 May 202').text, '25 May 202…');
+  assert.equal(p('25 May 202').status, 'partial');
+  // A short year that does resolve is a year, not an unfinished one.
+  assert.equal(p('2552').text, '25 May 2002');
+  assert.equal(p('25 May 2').text, '25 May 2002');
+  assert.equal(p('5252').text, 'May 25, 2002');
 });
 
 test('FR-20/FR-22: spans and parts describe the presented reading only', () => {
@@ -77,10 +81,10 @@ test('FR-20: no usable reading is reported as "Not enough information"', () => {
   }
 });
 
-test('AC-7/FR-14: undetermined keeps every surviving reading exposed', () => {
+test('AC-7/FR-14: undetermined keeps its surviving reading exposed', () => {
   const result = p('25');
   assert.equal(result.status, 'undetermined');
-  assert.ok(result.readings.length >= 2);
+  assert.equal(result.readings.length, 1);
   // A reading missing a whole part is exposed too, but never as a date.
   assert.ok(result.readings.some((reading) => reading.month == null));
 });

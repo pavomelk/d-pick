@@ -16,12 +16,15 @@ test('FR-12: a surviving little-endian reading suppresses every middle-endian on
   assert.equal(result.readings.length, 1);
   assert.ok(result.readings.every((reading) => reading.endianness === 'little'));
 
-  // `25` keeps two little-endian readings (day 25 alone, day 2 + month 5), so
-  // it is "not enough information" rather than a partial date.
+  // `25` is the day 25 with the month still missing: commitment forbids also
+  // reading it as day 2 + month 5, so it is "not enough information" rather
+  // than a partial date, and the one reading is exposed.
   const both = p('25');
   assert.equal(both.status, 'undetermined');
-  assert.ok(both.readings.length >= 2);
-  assert.ok(both.readings.every((reading) => reading.endianness === 'little'));
+  assert.equal(both.readings.length, 1);
+  assert.equal(both.readings[0].day, 25);
+  assert.equal(both.readings[0].month, null);
+  assert.equal(both.readings[0].endianness, 'little');
 });
 
 test('FR-12: little-endian wins even when middle-endian is also complete', () => {
@@ -32,18 +35,22 @@ test('FR-12: little-endian wins even when middle-endian is also complete', () =>
   assert.equal(result.text, '1 February 2024');
 });
 
-test('FR-12/OQ-1: preference is absolute, not a plausibility vote', () => {
-  // `1225` can be 1 February 2025 (little) or December 25 … (middle).
+test('FR-12/C16: the first plausible day is the one that is committed', () => {
+  // `12` is a valid day, so the remaining digits are month 2 and year 5 → 2005.
+  // The same digits read month-first would give December 2, 2005 and are dropped.
   const result = p('1225');
   assert.equal(result.status, 'complete');
   assert.equal(result.endianness, 'little');
-  assert.equal(result.date, '2025-02-01');
-  assert.equal(result.text, '1 February 2025');
+  assert.equal(result.date, '2005-02-12');
+  assert.equal(result.text, '12 February 2005');
+  assert.equal(result.readings.length, 1);
 });
 
 test('FR-12: middle-endian appears only once every little-endian reading is gone', () => {
-  const result = p('525');
+  // Day-first would need the year `52`, and no year in 1972…2026 ends in 52.
+  const result = p('5252');
   assert.equal(result.endianness, 'middle');
+  assert.equal(result.date, '2002-05-25');
   assert.ok(result.readings.every((reading) => reading.endianness === 'middle'));
 });
 

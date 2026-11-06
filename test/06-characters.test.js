@@ -41,7 +41,7 @@ test('FR-2: deleting is never blocked', () => {
   textInput.type('25524');
   textInput.backspace();
   assert.equal(textInput.value, '2552');
-  assert.equal(feedback.textContent, '25 May 202…');
+  assert.equal(feedback.textContent, '25 May 2002');
 });
 
 test('FR-2: separators and whitespace are accepted', () => {

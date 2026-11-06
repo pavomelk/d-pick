@@ -12,12 +12,19 @@ test('FR-27/AC-21: the date input holds a date only while the text resolves to o
   textInput.type('25524');
   assert.equal(dateInput.value, '2024-05-25');
 
+  // `2552` still resolves — a short year is a year — so the picker follows it.
   textInput.setCaretToEnd();
   textInput.backspace();
   assert.equal(textInput.value, '2552');
+  assert.equal(dateInput.value, '2002-05-25');
+
+  // `255` has no year at all: the picker empties at once while the text stays.
+  textInput.setCaretToEnd();
+  textInput.backspace();
+  assert.equal(textInput.value, '255');
   assert.equal(dateInput.value, '');
 
-  textInput.type('4');
+  textInput.type('24');
   assert.equal(dateInput.value, '2024-05-25');
 });
 
