@@ -10,14 +10,34 @@
     <main>
       <h1>Incremental Segmented Date Parser</h1>
       <p class="lead">
-        Demo page, served by Vite and loaded as plain ES modules — nothing is transpiled or minified.
+        Served by Vite and loaded as plain ES modules — nothing is transpiled or minified.
       </p>
 
       <section id="demo" aria-label="Parser demo">
-        <p class="note">
-          The parser is not implemented yet. The drafted requirements live in
-          <code>requirements.md</code>; the demo UI is added together with the first failing tests.
-        </p>
+        <div class="entry">
+          <label for="date-text">Date</label>
+          <div class="fields">
+            <input
+              id="date-text"
+              type="text"
+              placeholder="25 May 2024"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <input id="date-native" type="date" aria-label="Date from the native picker" />
+            <button type="button" id="open-picker">Picker</button>
+          </div>
+          <p id="date-feedback" class="feedback"></p>
+          <p class="hint">
+            Type a date in any order the parser can read (<code>25524</code>,
+            <code>25/5/2024</code>, <code>May 25, 2024</code>). <kbd>↓</kbd>/<kbd>↑</kbd> walk the
+            readings, <kbd>Enter</kbd> confirms, and leaving the field resets a value that is not a
+            full date.
+          </p>
+        </div>
+
+        <h2>Structured result</h2>
+        <pre id="date-result" class="result"></pre>
       </section>
     </main>
 

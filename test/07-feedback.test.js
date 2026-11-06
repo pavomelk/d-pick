@@ -1,0 +1,91 @@
+// §7 group 7 — status vocabulary and feedback text
+// (FR-19, FR-20, FR-21, FR-22).
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { parse } from '../src/parse.js';
+import { base } from './helpers/options.js';
+
+const p = (value, overrides) => parse(value, base(overrides));
+
+test('FR-20: a complete reading is shown with month names and its order', () => {
+  const little = p('25524');
+  assert.equal(little.text, '25 May 2024');
+  assert.equal(little.endianness, 'little');
+
+  const middle = p('52524');
+  assert.equal(middle.text, 'May 25, 2024');
+  assert.equal(middle.endianness, 'middle');
+});
+
+test('FR-20: a missing part shows an ellipsis after the preceding separator', () => {
+  assert.equal(p('525').text, 'May 25 …');
+  assert.equal(p('255').text, '25 May …');
+  assert.equal(p('25 sep').text, '25 September …');
+});
+
+test('FR-20: an unfinished year shows the prefix its completions share', () => {
+  assert.equal(p('5252').text, 'May 25, 202…');
+  assert.equal(p('2552').text, '25 May 202…');
+  assert.equal(p('25 May 2').text, '25 May 202…');
+  assert.equal(p('25 May 202').text, '25 May 202…');
+});
+
+test('FR-20/FR-22: spans and parts describe the presented reading only', () => {
+  const partial = p('25 May 202');
+  assert.equal(partial.status, 'partial');
+  assert.deepEqual(partial.parts, { day: 25, month: 5, year: null });
+  assert.deepEqual(partial.spans, { day: [0, 2], month: [3, 6], year: [7, 10] });
+  assert.equal(partial.date, null);
+  assert.equal(partial.index, 0);
+});
+
+test('FR-21: every status is reachable and machine readable', () => {
+  assert.equal(p('').status, 'empty');
+  assert.equal(p('   ').status, 'empty');
+  assert.equal(p('5').status, 'undetermined');
+  assert.equal(p('255').status, 'partial');
+  assert.equal(p('25524').status, 'complete');
+  assert.equal(p('5/5/05', { range: { from: '1900-01-01', to: 'now' } }).status, 'ambiguous');
+  assert.equal(p('xyz').status, 'invalid');
+  assert.equal(
+    p('31122019', { range: { from: '2020-01-01', to: '2020-12-31' } }).status,
+    'out-of-range',
+  );
+});
+
+test('FR-21: an empty value has no reading at all', () => {
+  const empty = p('');
+  assert.equal(empty.text, '');
+  assert.equal(empty.date, null);
+  assert.equal(empty.endianness, null);
+  assert.equal(empty.index, -1);
+  assert.deepEqual(empty.readings, []);
+});
+
+test('FR-20: no usable reading is reported as "Not enough information"', () => {
+  for (const [value, options] of [
+    ['5', undefined],
+    ['25 ju', undefined],
+    ['255/24', undefined],
+    ['31122019', { range: { from: '2020-01-01', to: '2020-12-31' } }],
+  ]) {
+    const result = p(value, options);
+    assert.equal(result.text, 'Not enough information', value);
+    assert.equal(result.date, null, value);
+  }
+});
+
+test('AC-7/FR-14: undetermined keeps every surviving reading exposed', () => {
+  const result = p('25');
+  assert.equal(result.status, 'undetermined');
+  assert.ok(result.readings.length >= 2);
+  // A reading missing a whole part is exposed too, but never as a date.
+  assert.ok(result.readings.some((reading) => reading.month == null));
+});
+
+test('FR-22: the structured result is a plain, serialisable object', () => {
+  const result = p('25524');
+  assert.deepEqual(JSON.parse(JSON.stringify(result)), result);
+});

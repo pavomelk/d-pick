@@ -1,8 +1,8 @@
 # Requirements — Incremental Segmented Date Parser
 
-Status: **draft v0.2** — v0.1 (from `problem_statement.md`) revised against the clarifications in §10;
-OQ-1 … OQ-4 are all decided (§11).
-Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C13 (§10).
+Status: **v0.3 — frozen for implementation.** v0.1 (from `problem_statement.md`) revised against the
+clarifications in §10; OQ-1 … OQ-4 and the C14/C15 review decisions are decided (§11).
+Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C15 (§10).
 Notation: **C#** clarification (§10) · **AC-#** acceptance scenario (§5) · **OQ-#** open question (§11) · **A-#** assumption (§11).
 
 Priorities: **MUST** = needed for the first working version · **SHOULD** = expected, unless clearly too costly · **MAY** = optional.
@@ -104,9 +104,12 @@ Non-goals for v1
   not a real calendar date (`31/2/2024`, `29/2/2023`) produces no reading.
 - **FR-9 (MUST)** A letter run that matches several months produces one reading per month; only the
   months that survive FR-11 remain.
-- **FR-10 (MUST)** Years of 1 or 3 digits are never year segments; a segmentation that needs one is
-  impossible. This — not the date range — is what eliminates the `02-05` reading of AC-8 (C2).
-  Two-digit years are expanded to a century per FR-13; four-digit years are used literally.
+- **FR-10 (MUST)** A year part is **complete** at exactly 2 or 4 digits — never at 1 or 3. A 1–2 digit
+  run is a two-digit year expanded to a century per FR-13; a 3–4 digit run is a literal year. A 1- or
+  3-digit run is therefore only ever an *unfinished* year while typing (AC-9, AC-15, AC-16, AC-21), and
+  it survives only while some 2- or 4-digit year it can still become is in range (FR-11). Consequently a
+  one-digit year run is a two-digit-year prefix, and the `02-05` reading of `255` dies because its only
+  completions (1950s, 2050s) lie outside `1972 … 2026` — not because of digit count (C2, C15).
 
 ### 4.3 Elimination and preference
 
@@ -124,8 +127,10 @@ Non-goals for v1
   centuries remain in the reading list as alternatives (AC-19). If no century is in range, the
   candidate is eliminated.
 - **FR-14 (MUST)** Present "not enough information" instead of a date when no reading is strictly
-  preferred — several readings remain with different day/month values, or the only readings are missing
-  a part (FR-6). FR-12's endianness preference decides between readings that differ only in endianness;
+  preferred — several readings remain that are not all complete dates (the same digits read as day 25
+  or as day 2 + month 5 for `25`, a letter run resolving to June or July for `25 ju`), or the only
+  readings are missing a whole part (FR-6). FR-12's endianness preference decides between readings that
+  differ only in endianness;
   FR-13's closeness to today decides between readings that differ only in century (those are presented
   as the preferred reading plus alternatives, FR-15).
 
@@ -135,9 +140,10 @@ Non-goals for v1
   remaining little-endian ones, then middle-endian, shorter/simpler segmentations first) and expose the
   list. While the list holds more than one reading, `ArrowDown` moves to the next reading and `ArrowUp`
   to the previous one, wrapping at the ends, and the feedback plus the structured result follow the
-  selected reading (C6). Navigation MUST NOT change the text field's value, MUST NOT fight the caret, and
-  MUST only be enabled when the list is small enough to be walked — an implementation cap (default 20,
-  `maxReadings` option) — otherwise the keys behave natively.
+  selected reading (C6). Partial readings are part of that list and are walked like complete ones.
+  Navigation MUST NOT change the text field's value, MUST NOT fight the caret, and MUST only be enabled
+  while the whole list — complete and partial readings alike — is small enough to walk: it is capped at
+  `maxReadings` (default 8) and above that cap the keys behave natively (C14).
 - **FR-16 (MUST)** `Enter` confirms the presented reading (C5):
   - when the presented reading is a full date — status `complete`, or `ambiguous` with the presented
     reading being one of the full dates (FR-15) — that date is confirmed;
@@ -174,18 +180,19 @@ Non-goals for v1
   - little-endian, complete → `25 May 2024`
   - a part that is missing entirely appears as an ellipsis in its position, after the separator that
     would precede it: `525` → `May 25 …`, `25 sep` → `25 September …`;
-  - an unfinished year shows the digits it already implies followed by an ellipsis, with no space:
-    `5252` → `May 25, 202…` (century `20` implied, `2` typed, one digit still missing), `2552` →
-    `25 May 202…`, `25 May 2` → `25 May 202…`;
+  - an unfinished year (FR-10) shows the digits that all of its surviving completions share, followed
+    by an ellipsis with no space: `25 May 2` → `25 May 202…` (completions 2020-2026 all start `202`),
+    `2552` → `25 May 202…`, `25 May 202` → `25 May 202…`, `5252` → `May 25, 202…`;
   - no usable reading → `Not enough information`
   When `ArrowDown` has selected a reading out of several, the selection is visible (e.g. `5 May 1905
   (2 of 2)`) so the user knows they left the preferred reading. Typography is an implementation detail;
   month names, ordering and the visible level of completeness are required.
 - **FR-21 (MUST)** Report a machine-readable status alongside the text: `empty`, `undetermined` (not
   enough information), `partial` (one preferred reading, still incomplete), `complete` (exactly one
-  in-range date), `ambiguous` (several in-range dates that only differ by century or month resolution,
-  presented best-first), `invalid` (input that can never form a date), `out-of-range` (readings were
-  eliminated only by the range: with the range filter removed a well-formed reading exists).
+  in-range date), `ambiguous` (several *complete* in-range dates survive — differing only by century,
+  e.g. `5/5/05`, or by the month a letter run resolves to once the year is known — presented
+  best-first), `invalid` (input that can never form a date), `out-of-range` (readings were eliminated
+  only by the range: with the range filter removed a well-formed reading exists).
 - **FR-22 (MUST)** Expose the structured result, not only text: status, the chosen date (`YYYY-MM-DD` or
   `null`), endianness, per-part values and digit spans, the index of the presented reading, and the
   reading list. The demo page renders it.
@@ -238,7 +245,7 @@ Non-goals for v1
     range: { from: '1972-02-05', to: 'now' }, // either bound optional
     textFormat: undefined,   // e.g. 'd-m-YYYY'   (FR-24)
     defaultValue: undefined, // written on blur reset (FR-25)
-    maxReadings: 20,         // ArrowDown cap (FR-15)
+    maxReadings: 8,          // ArrowDown cap (FR-15)
     onReadingChange,         // optional (reading) => void
     onConfirm,               // optional (isoDate) => void
   });
@@ -268,8 +275,8 @@ Base scenario: range `from = 1972-02-05`, `to = 'now'`, page instantiated on **2
 | ---- | ------- | -------------- | ---------------------- | ------------------------------------------------------------- |
 | 6    | `2`     | `undetermined` | Not enough information |                                                               |
 | 7    | `25`    | `undetermined` | Not enough information | still readable as day 25, or day 2 + month 5                   |
-| 8    | `255`   | `partial`      | `25 May …`             | month-first needs a 1-digit year, which never is a year (C2)   |
-| 9    | `2552`  | `partial`      | `25 May 202…`          | century 20 implied, one year digit typed                      |
+| 8    | `255`   | `partial`      | `25 May …`             | month-first would need `2|5|5`, whose one-digit year run can only complete to 1950s/2050s — outside the range (FR-10, C15) |
+| 9    | `2552`  | `partial`      | `25 May 202…`          | unfinished year; its completions 2020-2026 share `202`        |
 | 10   | `25524` | `complete`     | `25 May 2024`          | the date input gets 2024-05-25                                 |
 
 **AC-11 — range elimination**: with range `2020-01-01 … 2020-12-31`, `31122019` is `out-of-range` (the only
@@ -314,8 +321,12 @@ keeps `25524` and 2024-05-25, because the reading is `complete`.
 preferred `5 May 2005`, alternative `5 May 1905`; `ArrowDown` switches the feedback and the structured
 result to `5 May 1905 (2 of 2)`, the text field is untouched, and `Enter` then confirms 1905-05-05.
 
-**AC-20 — `'now'` is frozen (C8)**: a component created on 2026-11-04 still rejects 2026-11-05 as
-`out-of-range` on 2026-11-06 (clock injected in the test), and `max` on the date input stays 2026-11-04.
+**AC-20 — `'now'` is frozen (C8)**: a component created on 2026-11-04 still treats 2026-11-05 as
+unreachable when the page is used on 2026-11-06 (clock injected in the test): `25/11/2026` is
+`out-of-range` while `25/10/2026` is `complete`, and `max` on the date input stays 2026-11-04. The
+example deliberately uses day 25: a `d/m` pair with both values ≤ 12, such as `5/11/2026`, keeps a
+middle-endian reading (2026-05-11) that FR-11 and FR-12 let through, so it would not demonstrate the
+frozen bound.
 
 **AC-21 — an unresolved value clears the date input (OQ-4)**: confirm 2024-05-25, then edit the text to
 `25 May 202` (`partial`): the date input is emptied immediately while the typed text stays exactly as
@@ -338,6 +349,9 @@ leaves both fields empty.
   minified or transpiled artefacts are used in it, and it keeps working throughout the session.
 
 ## 7. Testing plan (tests written before code)
+
+Each numbered group is one file under `test/` (`01-segmentation.test.js` … `10-dom-binding.test.js`), so a
+failing test names the requirement it breaks from the first commit (C14).
 
 1. Segmentation per FR-4/FR-7: `5`, `52`, `525`, `5252`, `52524`, `2`, `25`, `255`, `2552`, `25524`,
    separator-pinned values (`25/5/2024`, `5.25.2024`, `255/24`, trailing `25/`), digit↔letter transitions.
@@ -396,6 +410,8 @@ leaves both fields empty.
 | C11 | "If user leaves control without unambigously interpreted values, the value should be set to default, which is 'undefined', unless specified explicity as an option parameter" | Blur resets anything that is not `complete` to `defaultValue` (default: cleared) and clears the date input                        | FR-25, AC-18                |
 | C12 | "It should be assumed that users are not expected to enter `YYYY-MM-DD` format."                                                          | Year-first entry is not expected: it is not parsed, and `textFormat` rejects year-first patterns with a `TypeError` so the field always re-parses | FR-24, A-4, OQ-2            |
 | C13 | "Answer to OQ-2: Reset text field and the date input. Whenever the date can not be resolved from user input is should be cleared." (labelled OQ-2, but it answers OQ-4/C11) | Both fields reset on blur, and the date input is emptied as soon as the text no longer resolves to exactly one date | FR-25, FR-27, OQ-4, AC-21   |
+| C14 | (design review) "partial vs undetermined — yes, that is the semantics I want"; "Arrow down walks partial readings too … but only if partial readings are less than ~8"; "I agree with your proposed test granularity" | `partial` = one preferred reading that is incomplete, `undetermined` = several incomplete readings or a whole part missing; ArrowDown walks partial readings within a cap of 8 readings; one test file per §7 group | FR-14, FR-15, FR-21, §7 |
+| C15 | (review of the draft) FR-10 said 1- or 3-digit year runs are impossible, which contradicts AC-9/15/16/21 where such a run is an unfinished year | A year is *complete* only at 2 or 4 digits; a 1- or 3-digit run is an unfinished year that survives while an in-range completion exists, and unfinished-year text shows the shared prefix of those completions | FR-10, FR-11, FR-20, AC-8, AC-9 |
 
 ## 11. Assumptions and questions
 
@@ -403,8 +419,12 @@ Assumptions (implemented as stated; say so if one is wrong)
 
 - **A-1** `textFormat` tokens are case-insensitive and driven by repeat count, so both `d-m-YYYY` and
   `DD-MM-YY` from C4 work; letters are the only token characters, so `T`/`Z`-style literals are rejected.
-- **A-2** "Reasonably small number of readings" is a cap (default 20); above it ArrowDown keeps its native
-  effect and the list is still exposed programmatically.
+- **A-2** "Reasonably small number of readings" is a cap (default 8, per C14) covering complete and
+  partial readings alike; above it ArrowDown keeps its native effect and the list is still exposed
+  programmatically (truncated to the cap, best first).
+- **A-5** `ambiguous` is reserved for several *complete* dates: a letter run resolving to several months
+  is `undetermined` while the year is still missing (`25 ju`, AC-12) and becomes `ambiguous` once a year
+  makes those readings complete.
 - **A-3** `defaultValue` is written verbatim into the text field (normally the empty string); if it
   happens to be a complete date, the date input is filled from it per FR-27, so the fields stay consistent.
 - **A-4** Users are not expected to enter a year-first date, so no year-first entry is parsed and no
