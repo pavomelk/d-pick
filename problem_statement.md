@@ -1,28 +1,47 @@
-component is intended to incrementally parse user input attempting to predict date.
-it should do so by analyzing entered consecutively entered digit or letter and eliminate possibilities of misinterpreting input 
-the component should work with midEndian and littleEdian dates only but it shoudl be able to recognize possibility of year being entered as two-digit year and derive century from that
-it should allow application to specify the dates range it is expected to operate (i.e from 20 September 1995 up to today) and use that information to rule out possibility of entered date being outside of allowed range
-the component should use <input type=text> web element but it shoud complement existing <input type="date"> in such a way that it allows standard date picker part of <input type="date"> to be used in combination with the <input type="text">.
-component should provide visual feedback about its current interpretation of user input on every text change in the <input type="text">
-it should use Month names in its interpretation
-component should prefer littleEndian interpretation of the date over the middleEndian
+# Incremental Date Parser — Problem Statement
 
-Example of the expected behaviour:
-Let's say, date range rules set as follows: the uppper and lower boundary can be specified with leaving eithre of them eithre undefined or defined as 'now' which means current date. upper boundary can not be less than the lower boundary and vice versa.
+## Goal
 
-Date Range set as ('1972-02-05', 'now') 
+The component incrementally parses user input to predict a date. It analyzes digits and letters as they are entered and eliminates interpretations that become impossible.
 
-User input  Response
-5           Not enough information, no suggestion
-2           First digit must be month, so May...
-5           "May 25..."
-2           "May 25, 202..."
-4           "May 25, 2024" - parsing complete, date identified
+## Requirements
 
-OR
+- Support middle-endian and little-endian dates only.
+- Recognize when a year is entered with two digits and derive its century.
+- Let the application specify the date range in which the component should operate (for example, from 20 September 1995 to today), and use that range to rule out dates outside it.
+- Use an `<input type="text">` element while complementing an existing `<input type="date">`, so the native date picker remains usable alongside the text input.
+- Provide visual feedback about the current interpretation on every text change in the text input.
+- Use month names in the interpretation.
+- Prefer little-endian interpretation over middle-endian.
 
-2           Not enough information
-5           Not enout information
-5           Can not be 02-05 because the following "5" can not fall into permitted year range. So it must be "25 May ..."
-2           "25 May 20..."
-4           "25 May 2024" - parsing complete.
+## Date Range
+
+The lower and upper bounds may each be left undefined or set to `'now'`, meaning the current date. The upper bound cannot be earlier than the lower bound.
+
+## Example Behaviour
+
+For the examples below, the date range is `('1972-02-05', 'now')`.
+
+### Example 1: Month-First Input
+
+A leading `5` is enough to assume the month-first interpretation: the user is entering month 5 (May). Each row shows the next character typed and the value entered so far.
+
+| Next character | Value so far | Feedback |
+| --- | --- | --- |
+| `5` | `5` | May — month 5 is assumed as the first part |
+| `2` | `52` | May 2 … |
+| `5` | `525` | May 25 … |
+| `2` | `5252` | May 25, 2002 — year 52 resolves within the allowed range |
+| `4` | `52524` | May 25, 2024 — parsing complete, date identified |
+
+### Example 2: Day-First Input
+
+Alternatively, the same kind of input can be read day-first.
+
+| Next character | Value so far | Feedback |
+| --- | --- | --- |
+| `2` | `2` | Not enough information |
+| `5` | `25` | Not enough information |
+| `5` | `255` | Cannot be 02-05 because the following `5` cannot fall into the permitted year range, so it must be 25 May... |
+| `2` | `2552` | 25 May 20... |
+| `4` | `25524` | 25 May 2024 — parsing complete |
