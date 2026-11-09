@@ -4,6 +4,8 @@ A plain JavaScript component that incrementally reads a date from a text input a
 
 It is designed to complement, not replace, an existing `<input type="date">`. The native picker remains available while the text field gives immediate, range-aware feedback as the user types.
 
+**Live demo:** [https://pavomelk.github.io/d-pick/](https://pavomelk.github.io/d-pick/)
+
 ## Features
 
 - Incremental parsing on every text change
@@ -28,7 +30,7 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite to use the demo.
+Open the URL printed by Vite, or use the live demo at [https://pavomelk.github.io/d-pick/](https://pavomelk.github.io/d-pick/).
 
 ## Usage
 
@@ -102,7 +104,11 @@ The structured result includes `status`, `date`, `endianness`, `parts`, `spans`,
 
 ## Demo
 
+The demo is published with GitHub Pages at [https://pavomelk.github.io/d-pick/](https://pavomelk.github.io/d-pick/).
+
 `index.html` is a Vite-served demo that imports the source modules directly. It renders the feedback text, the highlighted suggestion, and the full structured result.
+
+To run it locally:
 
 ```bash
 npm run dev
