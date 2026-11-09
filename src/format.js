@@ -51,6 +51,74 @@ export function formatReading(reading) {
 const TOKEN_LENGTHS = { d: [1, 2], m: [1, 4], y: [2, 4] };
 const PATTERN_SEPARATORS = new Set([' ', '\n', '.', '-', '/', ',']);
 const LETTER = /[A-Za-z]/;
+const NBSP = '&nbsp;';
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (character) => HTML_ESCAPES[character]);
+}
+
+function emphasize(text) {
+  return `<em>${escapeHtml(text)}</em>`;
+}
+
+function typedSpan(value, span) {
+  return span ? value.slice(span[0], span[1]) : '';
+}
+
+function highlightDay(reading, value) {
+  if (reading.day === null) return ELLIPSIS;
+  return emphasize(typedSpan(value, reading.spans?.day) || String(reading.day));
+}
+
+function highlightMonth(reading, value) {
+  if (reading.month === null) return ELLIPSIS;
+
+  const name = MONTH_NAMES[reading.month - 1];
+  const typed = typedSpan(value, reading.spans?.month);
+
+  if (LETTER.test(typed)) {
+    if (name.toLowerCase().startsWith(typed.toLowerCase())) {
+      return `${emphasize(name.slice(0, typed.length))}${escapeHtml(name.slice(typed.length))}`;
+    }
+    return emphasize(name);
+  }
+
+  return `${emphasize(typed || String(reading.month))}(${escapeHtml(name)})`;
+}
+
+function highlightYear(reading, value) {
+  if (reading.year !== null) {
+    const full = String(reading.year);
+    const typed = typedSpan(value, reading.spans?.year);
+    if (typed && full.endsWith(typed)) {
+      const prefix = full.slice(0, full.length - typed.length);
+      return `${escapeHtml(prefix)}${emphasize(typed)}`;
+    }
+    return emphasize(full);
+  }
+
+  if (reading.yearPrefix) return `${emphasize(reading.yearPrefix)}${ELLIPSIS}`;
+  return ELLIPSIS;
+}
+
+/** The presented reading as HTML, with the typed parts emphasized (FR-30). */
+export function highlightReading(reading, value = '') {
+  const dayText = highlightDay(reading, value);
+  const monthText = highlightMonth(reading, value);
+  const yearText = highlightYear(reading, value);
+
+  if (reading.month !== null && reading.day === null && reading.year === null && !reading.yearPrefix) {
+    return monthText;
+  }
+
+  if (reading.endianness === 'middle') {
+    return reading.year === null && !reading.yearPrefix
+      ? `${monthText}${NBSP}${dayText}${NBSP}${yearText}`
+      : `${monthText}${NBSP}${dayText},${NBSP}${yearText}`;
+  }
+  return `${dayText}${NBSP}${monthText}${NBSP}${yearText}`;
+}
 
 /**
  * Validates a `textFormat` pattern once, at construction (FR-24).
@@ -136,6 +204,7 @@ export function selectReading(result, index) {
       endianness: null,
       parts: null,
       spans: null,
+      highlighted: '',
     };
   }
 
@@ -154,5 +223,6 @@ export function selectReading(result, index) {
     endianness: reading.endianness,
     parts: { day: reading.day, month: reading.month, year: reading.year },
     spans: reading.spans,
+    highlighted: isMessage ? '' : highlightReading(reading, result.value || ''),
   };
 }

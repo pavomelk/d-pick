@@ -12,6 +12,7 @@ const RANGE = { from: '1972-02-05', to: 'now' };
 const textInput = document.querySelector('#date-text');
 const dateInput = document.querySelector('#date-native');
 const feedback = document.querySelector('#date-feedback');
+const highlight = document.querySelector('#date-highlight');
 const openPicker = document.querySelector('#open-picker');
 const resultSlot = document.querySelector('#date-result');
 
@@ -24,6 +25,7 @@ function summarise(result) {
     endianness: result.endianness,
     parts: result.parts,
     spans: result.spans,
+    highlighted: result.highlighted,
     index: result.index,
     navigable: result.navigable,
     readings: result.readings.map((reading) => ({
@@ -37,13 +39,14 @@ function summarise(result) {
   };
 }
 
-if (textInput && dateInput && feedback && resultSlot) {
+if (textInput && dateInput && feedback && highlight && resultSlot) {
   const parser = createIncrementalDateParser({
     textInput,
     dateInput,
     feedback,
     range: RANGE,
     onReadingChange: (result) => {
+      highlight.innerHTML = result.highlighted;
       resultSlot.textContent = JSON.stringify(summarise(result), null, 2);
     },
     onConfirm: (iso) => {

@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { parse } from '../src/parse.js';
+import { selectReading } from '../src/format.js';
 import { base } from './helpers/options.js';
 
 const p = (value, overrides) => parse(value, base(overrides));
@@ -99,4 +100,62 @@ test('AC-7/FR-14: undetermined keeps its surviving reading exposed', () => {
 test('FR-22: the structured result is a plain, serialisable object', () => {
   const result = p('25524');
   assert.deepEqual(JSON.parse(JSON.stringify(result)), result);
+});
+
+test('FR-30/AC-31: numeric parts keep the typed digits and months add their name', () => {
+  const result = parse('2 4 52', {
+    range: { from: '1900-01-01', to: '2000-12-31' },
+    now: '2026-11-04',
+  });
+  assert.equal(result.text, '2 April 1952');
+  assert.equal(result.highlighted, '<em>2</em>&nbsp;<em>4</em>(April)&nbsp;19<em>52</em>');
+
+  assert.equal(
+    p('25/5/2024').highlighted,
+    '<em>25</em>&nbsp;<em>5</em>(May)&nbsp;<em>2024</em>',
+  );
+  assert.equal(
+    p('5/25/2024').highlighted,
+    '<em>5</em>(May)&nbsp;<em>25</em>,&nbsp;<em>2024</em>',
+  );
+});
+
+test('FR-30/AC-31: a typed month prefix is emphasized inside the month name', () => {
+  assert.equal(p('ja').highlighted, '<em>Ja</em>nuary');
+  assert.equal(p('N').highlighted, '<em>N</em>ovember');
+  assert.equal(p('J').highlighted, '<em>J</em>une');
+  assert.equal(selectReading(p('J'), 1).highlighted, '<em>J</em>uly');
+});
+
+test('FR-30/AC-31: short years emphasize the suffix and partial years their prefix', () => {
+  assert.equal(
+    p('25524').highlighted,
+    '<em>25</em>&nbsp;<em>5</em>(May)&nbsp;20<em>24</em>',
+  );
+  assert.equal(
+    p('25 May 202').highlighted,
+    '<em>25</em>&nbsp;<em>May</em>&nbsp;<em>202</em>…',
+  );
+  assert.equal(p('25 Sep').highlighted, '<em>25</em>&nbsp;<em>Sep</em>tember&nbsp;…');
+  assert.equal(p('5').highlighted, '<em>5</em>(May)');
+});
+
+test('FR-30/AC-31: the selected reading supplies the highlighted date', () => {
+  const result = parse('5/5/05', { range: { from: '1900-01-01', to: 'now' }, now: '2026-11-04' });
+  assert.equal(
+    selectReading(result, 1).highlighted,
+    '<em>5</em>(May)&nbsp;<em>5</em>,&nbsp;19<em>05</em>',
+  );
+});
+
+test('FR-30: message statuses have no highlighted date', () => {
+  const cases = [
+    ['', undefined],
+    ['25', undefined],
+    ['xyz', undefined],
+    ['31122019', { range: { from: '2020-01-01', to: '2020-12-31' } }],
+  ];
+  for (const [value, overrides] of cases) {
+    assert.equal(p(value, overrides).highlighted, '', value);
+  }
 });

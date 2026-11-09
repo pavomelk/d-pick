@@ -28,6 +28,7 @@
             <button type="button" id="open-picker">Picker</button>
           </div>
           <p id="date-feedback" class="feedback"></p>
+          <p id="date-highlight" class="highlight" aria-hidden="true"></p>
           <p class="hint">
             Type a date in any order the parser can read (<code>25524</code>,
             <code>25/5/2024</code>, <code>May 25, 2024</code>). <kbd>↓</kbd>/<kbd>↑</kbd> walk the
@@ -35,7 +36,8 @@
             and <kbd>Esc</kbd> cancels the edit. Leaving with an unfinished value resets it, and
             <kbd>Tab</kbd> moves focus without entering the field. A month prefix is shown as soon as
             it is determined: <code>N</code> gives November, while <code>J</code> starts at June and
-            <kbd>↓</kbd> walks July and January.
+            <kbd>↓</kbd> walks July and January. A separator after <kbd>↓</kbd> accepts the selected
+            reading, so later typing extends it and leaving the field confirms it.
           </p>
           <p class="hint">
             The cut is committed as you type, so a separator or a leading zero is how you steer it:

@@ -152,6 +152,33 @@ test('AC-28: a YY commit falls back to display text for another century', () => 
   assert.equal(parse(textInput.value, base({ range })).date, '1905-05-05');
 });
 
+test('C30: blur confirms an alternative kept selected by a separator', () => {
+  const range = { from: '1900-01-01', to: 'now' };
+  const { textInput, dateInput, confirmed } = setup({ range });
+  textInput.type('5/5/05');
+  textInput.key('ArrowDown');
+  textInput.type(' ');
+
+  textInput.blur();
+  assert.deepEqual(confirmed, ['1905-05-05']);
+  assert.equal(textInput.value, 'May 5, 1905');
+  assert.equal(dateInput.value, '1905-05-05');
+});
+
+test("C30: blur completes an accepted partial alternative with today's year", () => {
+  const { textInput, dateInput, feedback, confirmed } = setup();
+  textInput.type('J');
+  textInput.key('ArrowDown');
+  textInput.type(' ');
+  textInput.type('25');
+  assert.equal(feedback.textContent, 'July 25 … (2 of 3)');
+
+  textInput.blur();
+  assert.deepEqual(confirmed, ['2026-07-25']);
+  assert.equal(textInput.value, 'July 25, 2026');
+  assert.equal(dateInput.value, '2026-07-25');
+});
+
 test('FR-25: an empty field is left alone on blur', () => {
   const { textInput, dateInput } = setup({ defaultValue: '1.1.2000' });
   textInput.blur();

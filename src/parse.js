@@ -149,6 +149,7 @@ export function parse(value, options = {}) {
     endianness: null,
     parts: null,
     spans: null,
+    highlighted: '',
   };
 
   if (status === 'empty') return { ...base, text: '' };

@@ -10,7 +10,50 @@ import { normaliseNow, parse, resolveRange } from './parse.js';
 
 const ALLOWED_INSERTION = /^[0-9A-Za-z.\-/, \n\r\f\v]*$/;
 const DISALLOWED_CHARACTERS = /[^0-9A-Za-z.\-/, \n\r\f\v]/g;
+const SEPARATOR_CHARACTERS = new Set([' ', '\n', '\r', '\f', '\v', '.', '-', '/', ',']);
 const DEFAULT_MAX_READINGS = 8;
+
+function isSeparatorInput(data) {
+  if (typeof data !== 'string' || data.length === 0) return false;
+  for (const character of data) {
+    if (!SEPARATOR_CHARACTERS.has(character)) return false;
+  }
+  return true;
+}
+
+/** Whether `reading` still carries every part the accepted reading had. */
+function readingExtends(reading, anchor, openYear = false) {
+  if (anchor.endianness && reading.endianness !== anchor.endianness) return false;
+  if (anchor.day !== null && reading.day !== anchor.day) return false;
+  if (anchor.month !== null && reading.month !== anchor.month) return false;
+  if (!openYear && anchor.year !== null && reading.year !== anchor.year) return false;
+
+  if (anchor.yearPrefix) {
+    if (reading.yearPrefix) {
+      if (
+        !reading.yearPrefix.startsWith(anchor.yearPrefix) &&
+        !anchor.yearPrefix.startsWith(reading.yearPrefix)
+      ) {
+        return false;
+      }
+    } else if (reading.year !== null) {
+      if (!String(reading.year).padStart(4, '0').startsWith(anchor.yearPrefix)) return false;
+    } else {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function yearRunLength(reading) {
+  const span = reading.spans && reading.spans.year;
+  return span ? span[1] - span[0] : 0;
+}
+
+function isOpenYear(reading) {
+  return reading.year === null || reading.yearPrefix !== null;
+}
 
 let instanceCount = 0;
 
@@ -38,6 +81,9 @@ export function createIncrementalDateParser(options = {}) {
 
   const managed = [];
   let selectedIndex = 0;
+  // An alternative accepted with a separator (C30) stays selected across edits.
+  let acceptedReading = null;
+  let acceptedYearOpen = false;
   let result = parse(textInput.value, parseOptions);
   let current = selectReading(result, 0);
   let lastCommittedText = null;
@@ -95,9 +141,37 @@ export function createIncrementalDateParser(options = {}) {
     return presented;
   }
 
-  function syncFromText() {
-    selectedIndex = 0;
+  function syncFromText(input = {}) {
+    const inputType = input.inputType || '';
+    const deletion = inputType.startsWith('delete') || inputType.startsWith('history');
+
+    if (deletion) {
+      acceptedReading = null;
+      acceptedYearOpen = false;
+    } else if (isSeparatorInput(input.data) && selectedIndex > 0) {
+      acceptedReading = current.readings[selectedIndex] || null;
+      acceptedYearOpen = acceptedReading ? isOpenYear(acceptedReading) : false;
+    }
+
     result = parse(textInput.value, parseOptions);
+
+    if (acceptedReading) {
+      const index = result.readings.findIndex((reading) =>
+        readingExtends(reading, acceptedReading, acceptedYearOpen),
+      );
+      if (index >= 0) {
+        selectedIndex = index;
+        acceptedReading = result.readings[index];
+        acceptedYearOpen = acceptedYearOpen && yearRunLength(acceptedReading) < 4;
+      } else {
+        selectedIndex = 0;
+        acceptedReading = null;
+        acceptedYearOpen = false;
+      }
+    } else {
+      selectedIndex = 0;
+    }
+
     render();
   }
 
@@ -115,7 +189,7 @@ export function createIncrementalDateParser(options = {}) {
     textInput.value = value.slice(0, start) + text + value.slice(end);
     const caret = start + text.length;
     if (typeof textInput.setSelectionRange === 'function') textInput.setSelectionRange(caret, caret);
-    syncFromText();
+    syncFromText({ data: text, inputType: 'insertFromPaste' });
   }
 
   function confirmableDate() {
@@ -125,16 +199,20 @@ export function createIncrementalDateParser(options = {}) {
     if (current.status === 'complete' || current.status === 'ambiguous') return current.date;
     if (current.status !== 'partial') return null;
 
-    const reading = current.readings[0];
+    const reading = acceptedReading
+      ? current.readings[current.index] || current.readings[0]
+      : current.readings[0];
     if (reading.day === null || reading.month === null) return null;
     // A year the user started is never invented (AC-16).
     if (reading.yearPrefix) return null;
 
-    const agrees = current.readings.every(
-      (other) =>
-        other.day === reading.day && other.month === reading.month && !other.yearPrefix,
-    );
-    if (!agrees) return null;
+    if (!acceptedReading) {
+      const agrees = current.readings.every(
+        (other) =>
+          other.day === reading.day && other.month === reading.month && !other.yearPrefix,
+      );
+      if (!agrees) return null;
+    }
 
     const year = Number(frozenNow.slice(0, 4));
     if (!isValidDate(year, reading.month, reading.day)) return null;
@@ -170,6 +248,8 @@ export function createIncrementalDateParser(options = {}) {
     lastCommittedText = textInput.value;
 
     selectedIndex = 0;
+    acceptedReading = null;
+    acceptedYearOpen = false;
     result = parse(textInput.value, parseOptions);
     render();
 
@@ -188,9 +268,9 @@ export function createIncrementalDateParser(options = {}) {
     if (cleaned) insertSanitised(cleaned);
   }
 
-  function onInput() {
+  function onInput(event) {
     if (destroyed) return;
-    syncFromText();
+    syncFromText({ data: event.data, inputType: event.inputType });
   }
 
   function onKeyDown(event) {
@@ -200,6 +280,8 @@ export function createIncrementalDateParser(options = {}) {
       event.preventDefault();
       writeText(lastCommittedText == null ? defaultValue : lastCommittedText);
       selectedIndex = 0;
+      acceptedReading = null;
+      acceptedYearOpen = false;
       result = parse(textInput.value, parseOptions);
       render();
       return;
@@ -212,6 +294,11 @@ export function createIncrementalDateParser(options = {}) {
         event.key === 'ArrowDown'
           ? (selectedIndex + 1) % count
           : (selectedIndex - 1 + count) % count;
+      if (acceptedReading) {
+        acceptedReading = current.readings[selectedIndex] || null;
+        acceptedYearOpen =
+          acceptedYearOpen && acceptedReading !== null && yearRunLength(acceptedReading) < 4;
+      }
       event.preventDefault();
       render();
       return;
@@ -240,6 +327,8 @@ export function createIncrementalDateParser(options = {}) {
     // Anything Enter cannot confirm resets (FR-25, C11).
     writeText(defaultValue);
     selectedIndex = 0;
+    acceptedReading = null;
+    acceptedYearOpen = false;
     result = parse(textInput.value, parseOptions);
     render();
   }

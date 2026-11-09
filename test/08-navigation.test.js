@@ -51,6 +51,57 @@ test('C25: ArrowDown walks an ambiguous month prefix from June to July', () => {
   assert.equal(feedback.textContent, 'July (2 of 3)');
   assert.equal(textInput.value, 'J');
   assert.equal(dateInput.value, '');
+
+  textInput.key('ArrowDown');
+  assert.equal(feedback.textContent, 'January (3 of 3)');
+  textInput.key('ArrowDown');
+  assert.equal(feedback.textContent, 'June');
+});
+
+test('C30: a separator accepts the selected alternative and later input extends it', () => {
+  const { textInput, feedback } = setup();
+  textInput.type('J');
+  textInput.key('ArrowDown');
+  assert.equal(feedback.textContent, 'July (2 of 3)');
+
+  textInput.type(' ');
+  assert.equal(feedback.textContent, 'July (2 of 3)');
+
+  textInput.type('25');
+  assert.equal(feedback.textContent, 'July 25 … (2 of 3)');
+
+  textInput.type(' 2024');
+  assert.equal(feedback.textContent, 'July 25, 2024 (2 of 3)');
+  assert.equal(textInput.value, 'J 25 2024');
+});
+
+test('C30: an accepted alternative keeps a short year open while it is typed', () => {
+  const { textInput, feedback } = setup();
+  textInput.type('j');
+  textInput.key('ArrowDown');
+  textInput.key('ArrowDown');
+  assert.equal(feedback.textContent, 'January (3 of 3)');
+
+  textInput.type(' ');
+  textInput.type('4');
+  textInput.type(' ');
+  assert.equal(feedback.textContent, 'January 4 … (3 of 3)');
+
+  textInput.type('1');
+  assert.equal(feedback.textContent, 'January 4, 2001 (3 of 3)');
+
+  textInput.type('2');
+  assert.equal(feedback.textContent, 'January 4, 2012 (3 of 3)');
+});
+
+test('C30: a digit typed without a separator still resets to the preferred reading', () => {
+  const { textInput, feedback } = setup();
+  textInput.type('J');
+  textInput.key('ArrowDown');
+  assert.equal(feedback.textContent, 'July (2 of 3)');
+
+  textInput.type('2');
+  assert.equal(feedback.textContent, 'June 2 …');
 });
 
 test('FR-15: navigation is off above maxReadings, so the key stays native', () => {

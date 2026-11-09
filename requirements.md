@@ -1,8 +1,8 @@
 # Requirements — Incremental Segmented Date Parser
 
-Status: **v0.5 — frozen for implementation.** v0.1 (from `problem_statement.md`) revised against the
-clarifications in §10; OQ-1 … OQ-5 and the C14–C29 review decisions are decided (§11).
-Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C29 (§10).
+Status: **v0.7 — frozen for implementation.** v0.1 (from `problem_statement.md`) revised against the
+clarifications in §10; OQ-1 … OQ-5 and the C14–C31 review decisions are decided (§11).
+Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C31 (§10).
 Notation: **C#** clarification (§10) · **AC-#** acceptance scenario (§5) · **OQ-#** question (§11) · **A-#** assumption (§11).
 
 Priorities: **MUST** = needed for the first working version · **SHOULD** = expected, unless clearly too costly · **MAY** = optional.
@@ -185,7 +185,16 @@ Non-goals for v1
   selected reading (C6). Partial readings are part of that list and are walked like complete ones.
   Navigation MUST NOT change the text field's value, MUST NOT fight the caret, and MUST only be enabled
   while the whole list — complete and partial readings alike — is small enough to walk: it is capped at
-  `maxReadings` (default 8) and above that cap the keys behave natively (C14).
+  `maxReadings` (default 8) and above that cap the keys behave natively (C14). After `ArrowDown` has
+  selected an alternative, a following separator (space, `.`, `-`, `/`, `,`) accepts that selection
+  (C30): the selection survives the separator and later insertions, and later input completes the
+  selected alternative instead of the preferred one. A short year that is being typed after acceptance
+  stays open: the selected month and day remain fixed while the year digits move to the next
+  completion, until the year run reaches four digits. For an already complete alternative, the
+  separator only keeps it selected so blur or Enter commits it; it does not pin a new reading. An
+  ordinary edit that was not accepted this way, and a deletion, return the selection to the preferred
+  reading. `ArrowDown`/`ArrowUp` still wrap at the ends, so stepping past the last alternative returns
+  to the initially preferred reading.
 - **FR-16 (MUST)** `Enter` confirms the presented reading (C5):
   - when the presented reading is a full date — status `complete`, or `ambiguous` with the presented
     reading being one of the full dates (FR-15) — that date is confirmed;
@@ -194,7 +203,8 @@ Non-goals for v1
   - when the reading has no year part and its day and month are determined (all surviving readings agree
     on day and month, both parts closed), today's year is proposed as the default year and the date is
     confirmed if that year is inside the range (AC-15); if today's year is outside the range, nothing is
-    confirmed;
+    confirmed. If a separator accepted an alternative (C30), that selected reading is the one used for
+    the day and month, even though other month alternatives remain in the list;
   - otherwise (year run unfinished, reading `partial`/`undetermined`/`ambiguous` without a determined
     day+month, `invalid`, `out-of-range`) `Enter` confirms nothing and the value is unchanged.
   A confirmed date is reported through `onConfirm(date)` with `YYYY-MM-DD`.
@@ -248,8 +258,8 @@ Non-goals for v1
   `out-of-range` (readings were eliminated only by the range: with the range filter removed a
   well-formed reading exists; the feedback is `Date out of range` and `date` stays `null`).
 - **FR-22 (MUST)** Expose the structured result, not only text: status, the chosen date (`YYYY-MM-DD` or
-  `null`), endianness, per-part values and digit spans, the index of the presented reading, and the
-  reading list. The demo page renders it.
+  `null`), endianness, per-part values and digit spans, the index of the presented reading, the reading
+  list, and the highlighted suggestion string (FR-30). The demo page renders it.
 - **FR-23 (MUST)** Accessibility: the feedback element is announced politely (`role="status"` /
   `aria-live="polite"`), the component is fully usable with the keyboard alone, the selected reading is
   not conveyed by colour alone, and the text input carries a description of the expected entry.
@@ -271,8 +281,9 @@ Non-goals for v1
   (OQ-5 A, AC-28).
 - **FR-25 (MUST)** Leaving the text field (blur) commits a reading that `Enter` can confirm, using the
   same path and the same proposed year as FR-16: the text is rewritten canonically, the date input is
-  filled and `onConfirm` fires (C27, AC-18). A value already committed by Enter or the picker is not
-  confirmed again merely because focus leaves. A reading `Enter` cannot confirm (`partial` with an
+  filled and `onConfirm` fires (C27, AC-18). An alternative kept selected by a separator is the reading
+  blur confirms (C30). A value already committed by Enter or the picker is not confirmed again merely
+  because focus leaves. A reading `Enter` cannot confirm (`partial` with an
   unfinished year, `undetermined`, `invalid`, `out-of-range`) is reset to the `defaultValue` option and
   the date input is cleared, so a half-typed date never stays behind looking like a value (C11, OQ-4,
   C21). `defaultValue` defaults to `undefined`, which clears the field; an empty field is left alone.
@@ -317,7 +328,21 @@ Non-goals for v1
   parser.destroy();          // removes listeners, restores attributes it added
   ```
 
-  Option names are settled in the design step; the capabilities are not.
+- **FR-30 (MUST)** Expose `highlighted`, an HTML string for the presented reading that keeps the user's
+  matching input and emphasizes it with `<em>`:
+  - numeric day, month and year parts keep the digits the user typed; a numeric month is followed
+    immediately by the month name in parentheses: `2 4 52` (with a range that resolves the year to
+    1952) → `<em>2</em>&nbsp;<em>4</em>(April)&nbsp;19<em>52</em>`;
+  - a month typed as letters is shown as its full name with the matching prefix emphasized, preserving
+    the month name's capitalization: `ja` → `<em>Ja</em>nuary`, `J` → `<em>J</em>une`;
+  - separators follow the reading's endianness and use `&nbsp;`, with the same ellipsis, comma and
+    month-alone rules as FR-20; a missing part is an unemphasized ellipsis;
+  - message statuses (`empty`, `undetermined`, `invalid`, `out-of-range`) have no highlighted date
+    (`highlighted` is `''`);
+  - the string is safe to assign to `innerHTML`: it contains only known month names, fixed markup and
+    escaped user digits.
+  The demo page shows this string in a separate element, leaving the accessible feedback text unchanged
+  (FR-23).
 
 ## 5. Behaviour to reproduce (acceptance scenarios)
 
@@ -469,6 +494,24 @@ writes `05-05-05` and re-parses to 2005-05-05.
 | `04/05/2024` | `complete`     | `4 May 2024`           | a leading zero disables the hint                         |
 | `4 May 2024` | `complete`     | `4 May 2024`           | an explicit month name disables the hint                 |
 
+**AC-30 — a separator accepts the selected alternative (C30)**: with the base range, type `J`,
+`ArrowDown` → `July (2 of 3)`, then space: the selection stays on July. Typing `25` keeps it and
+typing `2024` completes `July 25, 2024 (2 of 3)`; blur confirms 2024-07-25 and writes
+`July 25, 2024`. With range `1900-01-01 … now`, `5/5/05` `ArrowDown` → `May 5, 1905 (2 of 2)`, then a
+separator keeps 1905 selected and blur confirms 1905-05-05. From `J`, `ArrowDown` twice reaches
+`January (3 of 3)` and one more `ArrowDown` returns to the initial `June`. From `j`, `ArrowDown` twice,
+space, `4`, space, `1` shows `January 4, 2001 (3 of 3)`; another `2` extends the short year to
+`January 4, 2012 (3 of 3)` instead of reverting to June.
+
+**AC-31 — highlighted suggestions keep and emphasize the typed input (C31)**: with range
+`1900-01-01 … 2000-12-31`, `2 4 52` is `2 April 1952` and `highlighted` is
+`<em>2</em>&nbsp;<em>4</em>(April)&nbsp;19<em>52</em>`. `ja` gives `<em>Ja</em>nuary`; `J` gives
+`<em>J</em>une`; after `ArrowDown`, July gives `<em>J</em>uly`. `25/5/2024` gives
+`<em>25</em>&nbsp;<em>5</em>(May)&nbsp;<em>2024</em>`, while `5/25/2024` gives
+`<em>5</em>(May)&nbsp;<em>25</em>,&nbsp;<em>2024</em>`. A missing part is an unemphasized ellipsis
+(`25 Sep` → `<em>25</em>&nbsp;<em>Sep</em>tember&nbsp;…`), and message statuses have an empty
+`highlighted` string. The demo renders `highlighted` in a separate element.
+
 ## 6. Non-functional requirements
 
 - **NFR-1** No runtime dependency; plain ES modules, no transpiling, no bundling required to use the
@@ -507,12 +550,13 @@ failing test names the requirement it breaks from the first commit (C14).
 6. Character blocking and paste sanitising (FR-2) in the DOM layer, including Tab not inserted or
    treated as a separator (C28, AC-27); unmatched letters → `invalid`.
 7. Status vocabulary and feedback text (FR-20, FR-21), including `Date out of range`, ellipsis positions,
-   selected-reading marker.
-8. Reading list order and ArrowDown/ArrowUp cycling, cap (FR-15); Enter confirmation matrix (FR-16).
+   selected-reading marker; highlighted suggestions (FR-30, AC-31).
+8. Reading list order and ArrowDown/ArrowUp cycling, cap (FR-15); separator-accepted alternatives
+   (C30, AC-30); Enter confirmation matrix (FR-16).
 9. `textFormat` rendering for each token and round-trip re-parse, year-first pattern → `TypeError`
    (FR-24); blur commit, blur reset and Esc cancel with and without `defaultValue`, including a complete
    `defaultValue` re-syncing the date input and the `YY` fallback for a non-preferred century
-   (FR-24, FR-25, A-3, OQ-5, AC-26, AC-28).
+   (FR-24, FR-25, A-3, OQ-5, AC-26, AC-28, AC-30).
 10. Page binding: `input`, paste, deletion, completion → date input value, editing back to a non-`complete`
     status → date input cleared (FR-27), picker → reading and text, no write loops, `destroy()` removes
     listeners (FR-1, FR-26 … FR-28).
@@ -575,6 +619,8 @@ failing test names the requirement it breaks from the first commit (C14).
 | C27 | "What if user does not press enter and leaves input? Should it commit? I think yes: once user commits (either by leaving input or pressing Enter), the original input becomes irrelevant and gets replaced with the suggested input. <Esc> will cancell the input." | Enter, picker and blur all commit through the same path, replacing the typed text with a canonical value. Blur uses Enter's current-year proposal when day and month are determined; a reading Enter cannot confirm still resets to `defaultValue`. A `YY` pattern that would re-parse to another century falls back to FR-20 display text for that commit (OQ-5 A). Esc restores the last committed canonical text, or `defaultValue` if none, without firing `onConfirm` | FR-16, FR-17, FR-24, FR-25, OQ-5, AC-18, AC-26, AC-28 |
 | C28 | "Additionally, <Tab> is not a separator (an invalid character) and not supoused to get inserted at all, instead it should allow to move away from the input." | Tab is never inserted or treated as a separator; it keeps native focus movement. Only space/non-Tab whitespace separates or confirms. Tabs in pasted text are stripped, not converted to boundaries | FR-2, FR-3, FR-4, AC-14, AC-27 |
 | C29 | "When first digit in user input starts with digit and is greater than 3 this should imply middle-endian date is entered and it starts with 4-th month of the year." | A leading unpadded first digit `4`–`9` in the first digit segment forces month-first: `5` → `May`, `52` → `May 2 …`, `525` → `May 25 …`, `4/5/2024` → `April 5, 2024`. A leading `0`–`3` or any explicit month-name run keeps the usual little-endian preference (`25`, `31/5/2024`, `04/05/2024`, `4 May 2024`) | FR-12, FR-14, AC-1 … AC-5, AC-29 |
+| C30 | "When auto suggested alternative is displayed following user's 'ArrowDown' presses, and the next user input is separator, this means user accepted that alternative suggestion and his following input will complement that alternative value instead of the initial." / "No, in that case blur should pick up the alternative suggestion. But 'ArrowDown' should cycle-through the alternatives, meaning once the last option is exhausted the next one proposed will be the one that was there initially." | A separator typed after `ArrowDown` accepts the selected alternative: the selection survives the separator and later insertions, and later input extends that alternative instead of the preferred reading. A short year typed after acceptance stays open until four digits (`January 4, 2001` + `2` → `January 4, 2012`, not June). For an already complete alternative (for example a different century), the separator only keeps it selected so blur or Enter commits it. ArrowDown/ArrowUp still wrap, returning to the initially preferred reading after the last alternative. An ordinary edit not accepted by a separator, and a deletion, reset the selection to the preferred reading | FR-15, FR-16, FR-25, AC-19, AC-30 |
+| C31 | "component should produce a string with the suggested date that contains the emphasized matching user input. e.g. if user typed '2 4 52', then string should look like '<em>2</em>&nbsp;<em>4</em>(April)&nbsp;19<em>52</em>.' (if range ends in 2000). Same for letter input: 'ja' -> '<em>Ja</em>nuary'. If user typed month in number, but suggestion is month name, then it should just follow user's original input in brackets. Small letter can be highlighted as capital letter in month name instead of being added as separate letter. Include that output in a separate element's text in the demo." | The structured result exposes `highlighted`: the presented reading with the user's matching digits emphasized, numeric months followed by `(MonthName)`, letter month prefixes emphasized inside the capitalized full name, `&nbsp;` separators and the same ellipsis/comma rules as FR-20. Message statuses have no highlighted date. The demo renders it in a separate element without replacing the accessible feedback | FR-22, FR-30, AC-31 |
 
 ## 11. Assumptions and questions
 

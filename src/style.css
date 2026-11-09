@@ -83,6 +83,23 @@ button:hover {
   content: "\00a0";
 }
 
+.highlight {
+  margin: 0 0 0.35rem;
+  min-height: 1.5rem;
+  font-size: 1.05rem;
+}
+
+.highlight:empty::before {
+  content: "\00a0";
+}
+
+.highlight em {
+  font-style: normal;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 .feedback[data-status="invalid"],
 .feedback[data-status="out-of-range"] {
   text-decoration: underline wavy currentColor;
