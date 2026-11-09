@@ -1,9 +1,9 @@
 # Requirements — Incremental Segmented Date Parser
 
-Status: **v0.3 — frozen for implementation.** v0.1 (from `problem_statement.md`) revised against the
-clarifications in §10; OQ-1 … OQ-4 and the C14–C17 review decisions are decided (§11).
-Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C17 (§10).
-Notation: **C#** clarification (§10) · **AC-#** acceptance scenario (§5) · **OQ-#** open question (§11) · **A-#** assumption (§11).
+Status: **v0.5 — frozen for implementation.** v0.1 (from `problem_statement.md`) revised against the
+clarifications in §10; OQ-1 … OQ-5 and the C14–C29 review decisions are decided (§11).
+Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C29 (§10).
+Notation: **C#** clarification (§10) · **AC-#** acceptance scenario (§5) · **OQ-#** question (§11) · **A-#** assumption (§11).
 
 Priorities: **MUST** = needed for the first working version · **SHOULD** = expected, unless clearly too costly · **MAY** = optional.
 
@@ -60,8 +60,8 @@ Non-goals for v1
 - **Reading (interpretation)** — a candidate or partial candidate the component presents.
 - **Reading list** — all readings of the current value, best first (FR-15).
 - **Commit** — turning the presented reading into a fixed value: Enter (FR-16), a native-picker selection
-  (FR-27) or a blur reset (FR-25).
-- **Segment confirmation** — ending a run with whitespace, which fixes the current guess for that run (a
+  (FR-27) or leaving the text field (FR-25).
+- **Segment confirmation** — ending a run with non-Tab whitespace, which fixes the current guess for that run (a
   unique month prefix becomes that month) without committing the date or rewriting the text (C22).
 - **Reparse** — building all readings from scratch from the current text value.
 
@@ -76,26 +76,28 @@ Non-goals for v1
   the same result, and a programmatic write (FR-17, FR-24, FR-27) is guarded so it does not create a
   second, different interpretation.
 - **FR-2 (MUST)** The only characters that may enter the text field are: decimal digits `0-9`, ASCII
-  letters, and the separators `.`, `-`, `/`, `,` and whitespace (space, tab) (C9). Any other
+  letters, and the separators `.`, `-`, `/`, `,` and whitespace other than Tab (space; C9, C28). Tab
+  MUST NOT be inserted or treated as a separator; it keeps its native focus movement. Any other
   character MUST be blocked before insertion (`beforeinput` prevention) and stripped from pasted,
-  dragged or autofilled text; the rest of the inserted text is kept (`2#5` → `25`). Blocking MUST NOT
-  block typed letters (they are needed for month names) and MUST NOT move the caret.
+  dragged or autofilled text; the rest of the inserted text is kept (`2#5` → `25`, `25\t5\t2024` →
+  `2552024`). Blocking MUST NOT block typed letters (they are needed for month names) and MUST NOT
+  move the caret.
 - **FR-3 (MUST)** A letter run is matched case-insensitively against English month names — full
   (`september`), abbreviated (`sep`, `sept`) and, while the user is still typing, as a *prefix*
   (`septem`). A run that is a prefix of several months (`ju` → June, July) yields one reading per month
   (FR-9). A run that matches no month name at all makes the value `invalid` (FR-20); the typed value is
-  still never modified. Whitespace after the run confirms it as the current guess (C22): a unique prefix
+  still never modified. Non-Tab whitespace after the run confirms it as the current guess (C22): a unique prefix
   is completed to its month (`N` + space is November), an ambiguous prefix is not decided by the space
   (`Ju` + space still has June and July as readings, with June preferred and ArrowDown reaching July),
   and the typed text is not rewritten (FR-5).
 - **FR-4 (MUST)** Segments end at a digit↔letter transition and at every separator (`.` `-` `/` `,`
-  whitespace). Separators are **hard boundaries** (C1): once the value contains one, every run between
+  and non-Tab whitespace). Separators are **hard boundaries** (C1): once the value contains one, every run between
   separators is exactly one segment and exactly one part — it is never merged with, or re-split across,
   a neighbour — so `255/24` cannot become `25|5/24` and has only the two parts `255` and `24`. A comma counts as a boundary as well, so the `MMMM, dd YYYY` display form
   written back into the field parses as three segments (FR-17). A run of separators counts as one, and
   leading or trailing separators are ignored. Only a value with no separator in it is split freely (FR-6).
-  Whitespace is also the confirmation gesture for the run before it (C22); the other separators are only
-  boundaries.
+  Non-Tab whitespace is also the confirmation gesture for the run before it (C22); the other separators
+  are only boundaries.
 - **FR-5 (MUST)** The typed value is never rewritten, reformatted, trimmed or reordered while the user is
   typing; only a commit (FR-17) may replace it.
 
@@ -147,10 +149,13 @@ Non-goals for v1
   could still become. A reading survives only while at least one in-range completion exists, so a value
   the user can still finish is never hidden.
 - **FR-12 (MUST)** Only little-endian (day-month-year) and middle-endian (month-day-year) are supported;
-  big-endian (year-month-day) is never produced (C19). Little-endian is preferred **strictly**: if at
-  least one little-endian reading survives FR-11, a little-endian reading is presented and no
-  middle-endian one is; middle-endian appears only when every little-endian reading has been eliminated
-  (the visible consequence is in AC-2, and it is a decision, not an oversight: OQ-1 in §11).
+  big-endian (year-month-day) is never produced (C19). Little-endian is preferred **strictly** unless
+  C29's hint applies: if at least one little-endian reading survives FR-11, a little-endian reading is
+  presented and no middle-endian one is; middle-endian appears only when every little-endian reading has
+  been eliminated, or when the first digit segment starts with `4`–`9` and no month name is present
+  (C29, AC-1 … AC-5, AC-29). That hint forces middle-endian even when a little-endian reading would
+  survive; a leading `0`–`3` or an explicit month name disables it. The visible consequence of the
+  strict preference is in AC-2, and it is a decision, not an oversight: OQ-1 in §11.
 - **FR-13 (MUST)** Derive the century of a short year from the allowed range (C3, C17, C20): a one- or
   two-digit run `v` takes the values `v + 100*c` and a three-digit run the values `v + 1000*c`; keep the
   centuries whose resulting date is inside the range. Among the survivors, the one closest to the frozen
@@ -158,11 +163,12 @@ Non-goals for v1
   range); the other surviving centuries remain in the reading list as alternatives (AC-19). If no
   century is in range, the run falls back to an unfinished year (FR-10).
 - **FR-14 (MUST)** Present "not enough information" only when no reading can be anchored because the
-  month is not determined (`25` is day 25 with the month still missing, `5` is day 5 for the same
+  month is not determined (`25` is day 25 with the month still missing, `2` is day 2 for the same
   reason). When a month is determined, present the best partial reading even if the day or year is
-  still missing: a uniquely identified month is shown immediately (`N` → `November`), and a letter run
-  resolving to several months presents its preferred reading first with the others reachable by
-  ArrowDown: calendar order, except a bare `J` is June, July, January (C26), so `J` → `June`,
+  still missing: a uniquely identified month is shown immediately (`N` → `November`, and under C29
+  `5` → `May`), and a letter run resolving to several months presents its preferred reading first with
+  the others reachable by ArrowDown: calendar order, except a bare `J` is June, July, January (C26),
+  so `J` → `June`,
   ArrowDown → `July`, and `25 ju` → `25 June …` (AC-12, AC-23). A determined day and month with only
   the year missing is `partial` too, because the year may be absent (FR-6).
   FR-12's endianness preference decides between readings that differ only in endianness; FR-13's
@@ -192,10 +198,12 @@ Non-goals for v1
   - otherwise (year run unfinished, reading `partial`/`undetermined`/`ambiguous` without a determined
     day+month, `invalid`, `out-of-range`) `Enter` confirms nothing and the value is unchanged.
   A confirmed date is reported through `onConfirm(date)` with `YYYY-MM-DD`.
-- **FR-17 (MUST)** A commit (FR-16, FR-27) makes the fields agree: the date input receives the confirmed
-  `YYYY-MM-DD` value (unless the commit came from the date input itself), and the text input is rewritten
-  with the `textFormat` pattern (FR-24) or, without one, with the display text of FR-20
-  (`25 May 2024`, `May 25, 2024`). The rewritten value MUST re-parse to the same date (AC-17).
+- **FR-17 (MUST)** A commit (FR-16, FR-25, FR-27) makes the fields agree: the date input receives the
+  confirmed `YYYY-MM-DD` value (unless the commit came from the date input itself), and the text input is
+  rewritten with the `textFormat` pattern (FR-24) or, without one, with the display text of FR-20
+  (`25 May 2024`, `May 25, 2024`). The rewritten value MUST re-parse to the same date (AC-17). If a
+  configured `YY` pattern cannot round-trip the confirmed date, that commit uses the display text
+  instead (OQ-5 A, AC-28).
 
 ### 4.5 Date range
 
@@ -221,14 +229,14 @@ Non-goals for v1
   - a part that is missing entirely appears as an ellipsis in its position, after the separator that
     would precede it: `5/25` → `May 25 …`, `25 sep` → `25 September …`;
   - a short year (FR-10) is shown as the full year it resolves to: `2552` → `25 May 2002`, `25 May 2`
-    → `25 May 2002`, `525` → `5 February 2005`;
+    → `25 May 2002`, `325` → `3 February 2005`;
   - an unfinished year (FR-10) shows the digits that all of its surviving completions share, followed
     by an ellipsis with no space: `25 May 202` → `25 May 202…` (no year in range ends in `202`, so the
     completions 2020-2026 decide the text);
   - `out-of-range` → `Date out of range` (the range is never relaxed to produce a date)
   - `undetermined` (month not determined) or `invalid` (no reading to show) → `Not enough information`
   - `empty` → no feedback text
-  When `ArrowDown` has selected a reading out of several, the selection is visible (e.g. `5 May 1905
+  When `ArrowDown` has selected a reading out of several, the selection is visible (e.g. `May 5, 1905
   (2 of 2)`) so the user knows they left the preferred reading. Typography is an implementation detail;
   month names, ordering and the visible level of completeness are required.
 - **FR-21 (MUST)** Report a machine-readable status alongside the text: `empty`, `undetermined` (not
@@ -252,20 +260,27 @@ Non-goals for v1
   pattern such as `d-m-YYYY`, `DD-MM-YYYY`, `MM-DD-YY`, `d.m.YYYY` or `d MMMM YYYY`. Tokens are
   case-insensitive and repeat-count driven: 1 letter = day/month without padding (`d`, `M`), 2 = padded
   numeric (`DD`, `MM`), 3 = abbreviated month name (`MMM`), 4 = full month name (`MMMM`), `YY` = 2-digit
-  year, `YYYY` = 4-digit year. Separators are copied literally; anything else in the pattern is a
-  `TypeError` at construction. Without `textFormat`, FR-17's display text is used. The prediction in the
+  year, `YYYY` = 4-digit year. Separators are copied literally (Tab is not a separator; C28); anything
+  else in the pattern is a `TypeError` at construction. Without `textFormat`, FR-17's display text is used. The prediction in the
   feedback always uses FR-20's forms, never the pattern. Year-first patterns (`YYYY-MM-DD`, `YY/MM/DD`)
   are rejected with a `TypeError` at construction (OQ-2): the value they write would not re-parse
   (FR-17), and users are not expected to type a year-first date (A-4). A `YY` token writes only the
   last two digits, so its re-parse always follows FR-13 (A-8); it is round-trip safe only for the
-  preferred century, and the commit behaviour for a selected alternative century is OQ-5 in §11.
-- **FR-25 (MUST)** When the text field loses focus (blur) with a value that is not unambiguously
-  interpreted — i.e. status other than `complete` — the text field is reset to the `defaultValue` option
-  and the date input is cleared, so a half-typed date never stays behind looking like a value (C11,
-  OQ-4, AC-18, C21). `defaultValue` defaults to `undefined`, which clears the field. A value that is
-  already `complete`, and an empty field, are left alone. The reset value is then treated like any other
-  text change: it is reparsed and reported (FR-1), and if `defaultValue` itself is a complete date,
-  FR-27 fills the date input from it; otherwise the date input stays empty.
+  preferred century. When the confirmed date lies in an alternative century, commit falls back to the
+  FR-20 display text for that value rather than writing a pattern that would re-parse to another date
+  (OQ-5 A, AC-28).
+- **FR-25 (MUST)** Leaving the text field (blur) commits a reading that `Enter` can confirm, using the
+  same path and the same proposed year as FR-16: the text is rewritten canonically, the date input is
+  filled and `onConfirm` fires (C27, AC-18). A value already committed by Enter or the picker is not
+  confirmed again merely because focus leaves. A reading `Enter` cannot confirm (`partial` with an
+  unfinished year, `undetermined`, `invalid`, `out-of-range`) is reset to the `defaultValue` option and
+  the date input is cleared, so a half-typed date never stays behind looking like a value (C11, OQ-4,
+  C21). `defaultValue` defaults to `undefined`, which clears the field; an empty field is left alone.
+  The reset value is then treated like any other text change: it is reparsed and reported (FR-1), and if
+  `defaultValue` itself is a complete date, FR-27 fills the date input from it; otherwise the date input
+  stays empty. `Esc` cancels the current edit: it restores the last committed canonical text, or
+  `defaultValue` if nothing has been committed, reparses and reports it, and does not fire `onConfirm`
+  (C27, AC-26).
 
 ### 4.8 Integration with `<input type="date">`
 
@@ -294,7 +309,7 @@ Non-goals for v1
     feedback,         // optional element, or (reading) => void renderer
     range: { from: '1972-02-05', to: 'now' }, // either bound optional
     textFormat: undefined,   // e.g. 'd-m-YYYY'   (FR-24)
-    defaultValue: undefined, // written on blur reset (FR-25)
+    defaultValue: undefined, // written on blur reset or Esc with no commit (FR-25)
     maxReadings: 8,          // ArrowDown cap (FR-15)
     onReadingChange,         // optional (reading) => void
     onConfirm,               // optional (isoDate) => void
@@ -309,19 +324,18 @@ Non-goals for v1
 Base scenario: range `from = 1972-02-05`, `to = 'now'`, page instantiated on **2026-11-04**, so the frozen
 `to` is 2026-11-04.
 
-**AC-1 … AC-5 — digits resolving to a middle-endian date (source example 1)**
+**AC-1 … AC-5 — a leading 4–9 selects a middle-endian date (source example 1, C29)**
 
-With the cut committed day-first (C16) and a short year reading as a year (C17), the source's
-month-first walkthrough holds only from the moment day-first has nothing left to work with; the earlier
-steps commit to day-first (OQ-1, decided).
+The first digit `5` is greater than 3, so the value is read month-first from the start (C29); the
+day-first cut is not considered. The source's month-first walkthrough therefore holds at every step.
 
-| step | value   | status         | reading                | note                                                                                    |
-| ---- | ------- | -------------- | ---------------------- | --------------------------------------------------------------------------------------- |
-| 1    | `5`     | `undetermined` | Not enough information | day 5 with the month still missing                                                       |
-| 2    | `52`    | `partial`      | `5 February …`         | day 5 is committed (`52` is not a day), so month 2 follows (OQ-1: decided)               |
-| 3    | `525`   | `complete`     | `5 February 2005`      | day 5 + month 2 + year 5 → 2005 (C17); the month-first reading is dropped by FR-12        |
-| 4    | `5252`  | `complete`     | `May 25, 2002`         | day-first would need the year `52`, and no year in range ends in 52 → middle-endian      |
-| 5    | `52524` | `complete`     | `May 25, 2024`         | one in-range date; the date input gets 2024-05-25                                        |
+| step | value   | status     | reading        | note                                                                 |
+| ---- | ------- | ---------- | -------------- | -------------------------------------------------------------------- |
+| 1    | `5`     | `partial`  | `May`          | month 5 is determined; the day is still missing (FR-14)              |
+| 2    | `52`    | `partial`  | `May 2 …`      | month 5, day 2, year still open                                      |
+| 3    | `525`   | `partial`  | `May 25 …`     | month 5, day 25, year still open                                     |
+| 4    | `5252`  | `complete` | `May 25, 2002` | year `2` is 2002 (1902 is out of range)                              |
+| 5    | `52524` | `complete` | `May 25, 2024` | one in-range date; the date input gets 2024-05-25                    |
 
 **AC-6 … AC-10 — digits resolving to a little-endian date (source example 2)**
 
@@ -352,7 +366,8 @@ the range leaves only 2020).
 | `255/24`     | `invalid`  | Not enough information | `255` cannot be re-split across `/`    |
 
 **AC-14 — characters are blocked, not accepted (C9)**: typing `#` leaves the value unchanged; pasting
-`2#5` yields `25`; `xyz` stays in the field but is `invalid` (no month name matches).
+`2#5` yields `25`; `xyz` stays in the field but is `invalid` (no month name matches). Tab is never
+inserted: it moves focus, and pasting `25\t5\t2024` strips the tabs to `2552024` (C28, AC-27).
 
 **AC-15 — Enter proposes the current year (C5)**: `25 Sep` is `partial` → `25 September …`; `Enter`
 proposes 2026, confirms 2026-09-25, fires `onConfirm('2026-09-25')`, rewrites the text field to
@@ -369,21 +384,24 @@ run — `25 May 202` — the reading stays `partial` → `25 May 202…` and `En
 `textFormat: 'YYYY-MM-DD'` construction throws a `TypeError`, so the field never holds a value the
 component cannot read back.
 
-**AC-18 — blur resets an unconfirmed value (C11)**: type `25 Sep` (status `partial`) and Tab away: the
-text field is cleared (`defaultValue` undefined) and the date input too. Typing `25524` and tabbing away
-keeps `25524` and 2024-05-25, because the reading is `complete`.
+**AC-18 — blur commits like Enter, otherwise resets (C11, C27)**: type `25524` and Tab away: it
+confirms 2024-05-25, rewrites the text to `25 May 2024` and fills the date input. Type `25 Sep` and Tab
+away: Enter's current-year proposal is used, so it confirms 2026-09-25 and rewrites to
+`25 September 2026`. Type `25 May 202` and Tab away: the unfinished year cannot be confirmed, so the
+text field is reset to `defaultValue` (cleared when undefined) and the date input is cleared. Typing
+`25524`, pressing Enter and then tabbing away does not fire `onConfirm` twice.
 
-**AC-19 — ArrowDown walks the readings (C6)**: with range `1900-01-01 … now`, `5/5/05` is `ambiguous`:
-preferred `5 May 2005`, alternative `5 May 1905`; `ArrowDown` switches the feedback and the structured
-result to `5 May 1905 (2 of 2)`, the text field is untouched, and `Enter` then confirms 1905-05-05.
+**AC-19 — ArrowDown walks the readings (C6)**: with range `1900-01-01 … now`, `5/5/05` is `ambiguous`
+and month-first under C29: preferred `May 5, 2005`, alternative `May 5, 1905`; `ArrowDown` switches the
+feedback and the structured result to `May 5, 1905 (2 of 2)`, the text field is untouched, and `Enter`
+then confirms 1905-05-05.
 
 **AC-20 — `'now'` is frozen (C8)**: a component created on 2026-11-04 still treats 2026-11-05 as
 unreachable when the page is used on 2026-11-06 (clock injected in the test): `25/11/2026` is
 `out-of-range` → `Date out of range` while `25/10/2026` is `complete`, and `max` on the date input stays
 2026-11-04. The
-example deliberately uses day 25: a `d/m` pair with both values ≤ 12, such as `5/11/2026`, keeps a
-middle-endian reading (2026-05-11) that FR-11 and FR-12 let through, so it would not demonstrate the
-frozen bound.
+example deliberately uses day 25: a `d/m` pair with both values ≤ 12, such as `5/11/2026`, is forced
+month-first by C29 (2026-05-11), which is in range, so it would not demonstrate the frozen bound.
 
 **AC-21 — an unresolved value clears the date input (OQ-4)**: confirm 2024-05-25, then edit the text to
 `25 May 202` (`partial`): the date input is emptied immediately while the typed text stays exactly as
@@ -400,9 +418,9 @@ leaves both fields empty.
 | `02305`    | `complete` | `2 March 2005`         | the leading zero fills the day, so the cut is 02\|3\|05, not 0\|23\|05 |
 | `2 5 23`   | `complete` | `2 May 2023`           |                                                                      |
 | `112`      | `partial`  | `11 February …`        | day 11 is committed; it never becomes day 1 + month 12               |
-| `25.5/2024`| `complete` | `25 May 2024`          | `.`, `/`, `-`, `,` and whitespace are interchangeable separators      |
+| `25.5/2024`| `complete` | `25 May 2024`          | `.`, `/`, `-`, `,` and spaces are interchangeable separators         |
 
-**AC-23 — month prefixes are presented immediately; whitespace confirms them (C22, C25)**
+**AC-23 — month prefixes are presented immediately; space confirms them (C22, C25)**
 
 | value        | status      | reading             | note                                                                    |
 | ------------ | ----------- | ------------------- | ----------------------------------------------------------------------- |
@@ -423,6 +441,33 @@ neither 2052 nor 1952 is inside it, and neither is rewritten into a valid nearby
 **AC-25 — `05` is a day until the year position (C24)**: `05` is `undetermined` → `Not enough
 information` (day 5, month missing), while `25 5 05` is `complete` → `25 May 2005` (day 25, month 5,
 year position `05`).
+
+**AC-26 — Esc cancels the edit (C27)**: confirm `25524` with Enter (`25 May 2024`), edit it to
+`25 May 202` and press Esc: the text returns to `25 May 2024`, the date input stays filled and no
+second `onConfirm` fires. With nothing committed and no `defaultValue`, Esc clears the field; with
+`defaultValue: '1.1.2000'`, Esc restores `1.1.2000` and fills 2000-01-01.
+
+**AC-27 — Tab is navigation, not content (C28)**: `25\t5\t2024` is `invalid` as a text value because
+Tab is not a separator. In the DOM layer, Tab is never inserted, `keydown` Tab is not prevented (focus
+moves natively), and pasting `25\t5\t2024` yields `2552024`.
+
+**AC-28 — a `YY` commit never changes the date (OQ-5 A)**: with `textFormat: 'MM-DD-YY'` and range
+`1900-01-01 … now`, `5/5/05` ArrowDown → 1905, then Enter (or blur) confirms 1905-05-05 and writes
+`May 5, 1905`, not `05-05-05`, because the pattern would re-parse as 2005. The preferred 2005 commit
+writes `05-05-05` and re-parses to 2005-05-05.
+
+**AC-29 — a leading 4–9 means month-first (C29)**
+
+| value        | status         | reading                | note                                                     |
+| ------------ | -------------- | ---------------------- | -------------------------------------------------------- |
+| `5`          | `partial`      | `May`                  | month 5 is determined before the day                     |
+| `52`         | `partial`      | `May 2 …`              | month 5, day 2                                           |
+| `525`        | `partial`      | `May 25 …`             | month 5, day 25                                          |
+| `4/5/2024`   | `complete`     | `April 5, 2024`        | month-first even though a day-first reading also exists  |
+| `25`         | `undetermined` | Not enough information | first digit 2 keeps the little-endian reading            |
+| `31/5/2024`  | `complete`     | `31 May 2024`          | first digit 3 keeps little-endian                        |
+| `04/05/2024` | `complete`     | `4 May 2024`           | a leading zero disables the hint                         |
+| `4 May 2024` | `complete`     | `4 May 2024`           | an explicit month name disables the hint                 |
 
 ## 6. Non-functional requirements
 
@@ -449,22 +494,25 @@ failing test names the requirement it breaks from the first commit (C14).
    `25524`, the committed cut (`112`, `1225`), the steering levers (`12 2 5`, `1 2 25`, `02305`,
    `2 5 23`), separator-pinned values (`25/5/2024`, `5.25.2024`, `255/24`, trailing `25/`),
    interchangeable separators (FR-2) and digit↔letter transitions.
-2. Endianness preference (FR-12) and "not enough information" (FR-14), including the AC-2 consequence.
+2. Endianness preference (FR-12), the C29 leading 4–9 month-first hint, and "not enough information"
+   (FR-14), including the AC-2 consequence and AC-29's exceptions.
 3. Range elimination (FR-11) for readings and unfinished years; bounds `undefined`/`'now'`/ISO; `'now'`
    frozen (FR-18); invalid ranges.
-4. Short-year centuries (FR-13, C17, C20): `5` → 2005, and with a range that admits them the preferred
-   completions `52` → 2052 and `952` → 1952; ranges spanning one and two centuries, preferred vs
-   alternative, and the unfinished prefix when no in-range year ends that way.
-5. Month names, abbreviations, prefixes, ambiguous prefixes and whitespace-confirmed prefixes: `N` →
+4. Short-year centuries (FR-13, C17, C20): `25 May 5` → 2005, and with a range that admits them the
+   preferred completions `25 May 52` → 2052 and `25 May 952` → 1952; ranges spanning one and two
+   centuries, preferred vs alternative, and the unfinished prefix when no in-range year ends that way.
+5. Month names, abbreviations, prefixes, ambiguous prefixes and space-confirmed prefixes: `N` →
    `November`, `J` → `June` with ArrowDown → `July` and then `January`, `25 ju` → `25 June …` with July
    next, `N 25`, `Ju 25` (FR-3, FR-9, FR-14, AC-12, AC-23, C26).
-6. Character blocking and paste sanitising (FR-2) in the DOM layer; unmatched letters → `invalid`.
+6. Character blocking and paste sanitising (FR-2) in the DOM layer, including Tab not inserted or
+   treated as a separator (C28, AC-27); unmatched letters → `invalid`.
 7. Status vocabulary and feedback text (FR-20, FR-21), including `Date out of range`, ellipsis positions,
    selected-reading marker.
 8. Reading list order and ArrowDown/ArrowUp cycling, cap (FR-15); Enter confirmation matrix (FR-16).
 9. `textFormat` rendering for each token and round-trip re-parse, year-first pattern → `TypeError`
-   (FR-24); blur reset with and without `defaultValue`, including a complete `defaultValue` re-syncing
-   the date input (FR-25, A-3).
+   (FR-24); blur commit, blur reset and Esc cancel with and without `defaultValue`, including a complete
+   `defaultValue` re-syncing the date input and the `YY` fallback for a non-preferred century
+   (FR-24, FR-25, A-3, OQ-5, AC-26, AC-28).
 10. Page binding: `input`, paste, deletion, completion → date input value, editing back to a non-`complete`
     status → date input cleared (FR-27), picker → reading and text, no write loops, `destroy()` removes
     listeners (FR-1, FR-26 … FR-28).
@@ -498,7 +546,7 @@ failing test names the requirement it breaks from the first commit (C14).
 
 | #   | clarification (as given)                                                                                                                    | decision now normative in the document                                                                                          | requirements                |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| C1  | "User may use separators such as dot, dash or slash and they indeed should mean segment boundaries"                                          | `.`, `-`, `/`, whitespace are hard boundaries: every run between them is one part and is never split across a neighbour; commas count as boundaries too, and whitespace additionally confirms the preceding guess (C22) | FR-4, AC-13                 |
+| C1  | "User may use separators such as dot, dash or slash and they indeed should mean segment boundaries"                                          | `.`, `-`, `/` and non-Tab whitespace are hard boundaries: every run between them is one part and is never split across a neighbour; commas count as boundaries too, and non-Tab whitespace additionally confirms the preceding guess (C22, C28) | FR-4, AC-13                 |
 | C2  | "Source example has logical error. It was meant to communicate the idea but happen to be far from perfect"                                    | The worked examples are illustrative only; the year rules (C15, then C17) are normative, the "range" wording is dropped              | FR-10, AC-8                 |
 | C3  | "The century should indeed be assumed to be closest to today"                                                                                | Preferred century = closest in-range century to the frozen `'now'`; other in-range centuries stay as alternatives                 | FR-13, FR-14, AC-19         |
 | C4  | "Date format in the text field should be converted according to the pattern … ('d-m-YYYY', 'MM-DD-YY' etc.) … during parsing and prediction, the guessed text should be presented as 'dd MMMM YYYY' or 'MMMM, dd YYYY'" | `textFormat` token pattern applied on commit only; prediction always uses `dd MMMM YYYY` / `MMMM, dd YYYY`                        | FR-20, FR-24, AC-17         |
@@ -508,22 +556,25 @@ failing test names the requirement it breaks from the first commit (C14).
 | C8  | "Range bound 'now' means the date at which the web page was instantiated. Should be fairly static value"                                      | `'now'` is resolved once at construction and never re-evaluated; clock injectable for tests                                       | FR-18, AC-20                |
 | C9  | "Yes, invalid characters should be blocked."                                                                                                  | Disallowed characters are prevented on input and stripped from pasted text; letters stay allowed for month names                  | FR-2, AC-14                 |
 | C10 | "Yes, factory function."                                                                                                                      | Factory over plain DOM, no custom element, no shadow DOM                                                                          | FR-29                       |
-| C11 | "If user leaves control without unambigously interpreted values, the value should be set to default, which is 'undefined', unless specified explicity as an option parameter" | Blur resets anything that is not `complete` to `defaultValue` (default: cleared) and clears the date input                        | FR-25, AC-18                |
+| C11 | "If user leaves control without unambigously interpreted values, the value should be set to default, which is 'undefined', unless specified explicity as an option parameter" | Blur commits a reading Enter can confirm; anything else is reset to `defaultValue` (default: cleared) and clears the date input (C27) | FR-25, AC-18, C27          |
 | C12 | "It should be assumed that users are not expected to enter `YYYY-MM-DD` format."                                                          | Year-first entry is not expected: it is not parsed, and `textFormat` rejects year-first patterns with a `TypeError` so the field always re-parses | FR-24, A-4, OQ-2            |
-| C13 | "Answer to OQ-2: Reset text field and the date input. Whenever the date can not be resolved from user input is should be cleared." (labelled OQ-2, but it answers OQ-4/C11) | Both fields reset on blur, and the date input is emptied as soon as the text no longer resolves to exactly one date | FR-25, FR-27, OQ-4, AC-21   |
+| C13 | "Answer to OQ-2: Reset text field and the date input. Whenever the date can not be resolved from user input is should be cleared." (labelled OQ-2, but it answers OQ-4/C11) | Unresolved text resets both fields on blur; a confirmable reading commits instead, and the date input is emptied as soon as the text no longer resolves to exactly one date | FR-25, FR-27, OQ-4, AC-21   |
 | C14 | (design review) "partial vs undetermined — yes, that is the semantics I want"; "Arrow down walks partial readings too … but only if partial readings are less than ~8"; "I agree with your proposed test granularity" | `partial` = a preferred presentable reading that is incomplete (alternative partial readings may be walked); `undetermined` = no reading with a determined month to present; **the `undetermined` half is superseded by C25**; ArrowDown walks partial readings within a cap of 8 readings; one test file per §7 group | FR-14, FR-15, FR-21, §7 |
 | C15 | (review of the draft) FR-10 said 1- or 3-digit year runs are impossible, which contradicts AC-9/15/16/21 where such a run is an unfinished year | A 1- or 3-digit run is an unfinished year that survives while an in-range completion exists, and unfinished-year text shows the shared prefix — **superseded by C17**, which makes a 1–3 digit run a year number first and leaves the prefix only as the fallback | FR-10, FR-11, FR-20, AC-8, AC-9 |
-| C16 | "Component should commit to initial assumption of endianness if it is plausible enough … '1225' should be interpreted 2005-02-12 … the user may have means to interact with interpretation by putting space (' ') and/or by adding zero ('0')"; "White space can be a separator too"; "separators should be allowed to be used interchangeably (space, /, ., -)" | The cut is committed, not enumerated: parts fill left to right in the assumed order, day and month take two digits whenever they are valid, the year takes the remaining digits, and a committed day is never re-split as more digits arrive. Separators and leading zeros are the user's levers (`1 2 25`, `02305`), and every separator — whitespace, `.`, `-`, `/`, `,` — is interchangeable | FR-2, FR-4, FR-6, AC-22 |
+| C16 | "Component should commit to initial assumption of endianness if it is plausible enough … '1225' should be interpreted 2005-02-12 … the user may have means to interact with interpretation by putting space (' ') and/or by adding zero ('0')"; "White space can be a separator too"; "separators should be allowed to be used interchangeably (space, /, ., -)" | The cut is committed, not enumerated: parts fill left to right in the assumed order, day and month take two digits whenever they are valid, the year takes the remaining digits, and a committed day is never re-split as more digits arrive. Separators and leading zeros are the user's levers (`1 2 25`, `02305`), and every separator — non-Tab whitespace, `.`, `-`, `/`, `,` — is interchangeable (C28) | FR-2, FR-4, FR-6, AC-22 |
 | C17 | "it reads initially as a year 2005 but it allows typing further, so it can be 2052 … if one types 95 and we already are trying to interpret year, this should be interpreted as 1995 but if following is 2 '952' it will be then assumed as 1952" | A 1–3 digit year run is a year *number*: it is the tail of the year (`5` is 05, `952` is 0952) and is completed to the nearest in-range century (`5` → 2005, `52` → 2052, `95` → 1995, `952` → 1952, when the range admits those years), which makes the reading complete while still open to more digits. Only a run no in-range year ends with stays an unfinished prefix | FR-10, FR-13, FR-16, FR-20, AC-16, AC-21, AC-22 |
 | C18 | (driving principle) "make it an assumption as soon as it is not contradicting several rules" | Make the earliest assumption the entered characters allow, as soon as none of the rules (calendar validity, range, segmentation, endianness) contradicts it; do not wait for more input when one reading is consistent | §1, FR-6, FR-14 |
-| C19 | "Dates can be little-endian and middle-endian, never big-endian"; "assumption about little-endian takes precedence over middle-endian" | Only little- and middle-endian readings exist; big-endian/year-first is never produced; little-endian wins strictly per FR-12 | FR-12, OQ-1 |
+| C19 | "Dates can be little-endian and middle-endian, never big-endian"; "assumption about little-endian takes precedence over middle-endian" | Only little- and middle-endian readings exist; big-endian/year-first is never produced; little-endian wins strictly per FR-12 unless C29's leading 4–9 hint applies | FR-12, OQ-1 |
 | C20 | "Incompleteness of the year … should prompt for suggesting the closest to the current century or millenium. So, the 52->2052 and 952->1952 should hold." | A 1–3 digit year run completes to the in-range year closest to the frozen `now`; `52` → 2052 and `952` → 1952 when the range admits those years. The range still removes completions outside it | FR-10, FR-13, AC-24, A-6 |
-| C21 | "Unresolved date should clear value, indeed." | Blur resets a non-`complete` text to `defaultValue` and clears the date input; the reset value is reparsed, and a complete `defaultValue` re-syncs the date input through FR-27 | FR-25, A-3, AC-18 |
-| C22 | "space should also allow completion of proposed system guess … starts typing 'N' … picks up … first is the month November, so the following <space> confirms that" | Whitespace is both a boundary and the confirmation gesture for the run before it: a unique month prefix is completed (`N` + space is November), an ambiguous prefix is not decided, and the text is never rewritten | FR-2, FR-3, FR-4, FR-6, AC-23, A-7 |
+| C21 | "Unresolved date should clear value, indeed." | Blur commits a reading Enter can confirm; an unresolved text resets to `defaultValue` and clears the date input. The reset value is reparsed, and a complete `defaultValue` re-syncs the date input through FR-27 | FR-25, A-3, AC-18 |
+| C22 | "space should also allow completion of proposed system guess … starts typing 'N' … picks up … first is the month November, so the following <space> confirms that" | Space (and non-Tab whitespace) is both a boundary and the confirmation gesture for the run before it: a unique month prefix is completed (`N` + space is November), an ambiguous prefix is not decided, and the text is never rewritten (C28) | FR-2, FR-3, FR-4, FR-6, AC-23, A-7 |
 | C23 | "No, let's not override FR11/FR13 and respect range precedence. Date out of range should trigger the response 'date out of range' and should not translate into valid date." | The range stays absolute and is never relaxed to rescue a value; an out-of-range value keeps `date = null`, clears the date input, and its visible feedback is `Date out of range` | FR-19, FR-20, FR-21, FR-27, AC-11, AC-20, AC-24 |
 | C24 | "If user starts his input as 05 - it is incomplete date, assumed to be 5th day of some month. If you mean that Day and Month are determined and user continues with 05 that should mean 2005." | A digit run is a year only once the day and month positions are filled; a leading `05` is day 5 with the month missing. In the year position `05` resolves by FR-13 (`05` → 2005, or the closest in-range year) | FR-6, FR-7, FR-10, A-8 |
 | C25 | "When user starts input with N the reading (the text should immediately produce 'November'. Also, because ArrowUp, ArrowDown can scroll through suggestions, J shall produce June and user can chose to press ArrowDown to change it to 'July'" | A determined month is presented immediately as a partial reading (`N` → `November`); an ambiguous month prefix produces partial readings ordered by C26, and ArrowDown/Up walks them (`J` → `June`, ArrowDown → `July`). This supersedes C14's rule that several incomplete readings are `undetermined` | FR-3, FR-14, FR-15, FR-20, FR-21, AC-12, AC-23, A-5 |
 | C26 | Bare `J` clarification: January, June and July all match; the chosen order is "June, July, January" | A bare `J` lists June, July, January; longer prefixes keep calendar order (`Ja` → January, `Ju` → June/July). January stays reachable as the third reading | FR-9, FR-14, FR-15, AC-23, A-5 |
+| C27 | "What if user does not press enter and leaves input? Should it commit? I think yes: once user commits (either by leaving input or pressing Enter), the original input becomes irrelevant and gets replaced with the suggested input. <Esc> will cancell the input." | Enter, picker and blur all commit through the same path, replacing the typed text with a canonical value. Blur uses Enter's current-year proposal when day and month are determined; a reading Enter cannot confirm still resets to `defaultValue`. A `YY` pattern that would re-parse to another century falls back to FR-20 display text for that commit (OQ-5 A). Esc restores the last committed canonical text, or `defaultValue` if none, without firing `onConfirm` | FR-16, FR-17, FR-24, FR-25, OQ-5, AC-18, AC-26, AC-28 |
+| C28 | "Additionally, <Tab> is not a separator (an invalid character) and not supoused to get inserted at all, instead it should allow to move away from the input." | Tab is never inserted or treated as a separator; it keeps native focus movement. Only space/non-Tab whitespace separates or confirms. Tabs in pasted text are stripped, not converted to boundaries | FR-2, FR-3, FR-4, AC-14, AC-27 |
+| C29 | "When first digit in user input starts with digit and is greater than 3 this should imply middle-endian date is entered and it starts with 4-th month of the year." | A leading unpadded first digit `4`–`9` in the first digit segment forces month-first: `5` → `May`, `52` → `May 2 …`, `525` → `May 25 …`, `4/5/2024` → `April 5, 2024`. A leading `0`–`3` or any explicit month-name run keeps the usual little-endian preference (`25`, `31/5/2024`, `04/05/2024`, `4 May 2024`) | FR-12, FR-14, AC-1 … AC-5, AC-29 |
 
 ## 11. Assumptions and questions
 
@@ -538,16 +589,16 @@ Assumptions (implemented as stated; say so if one is wrong)
   is `partial` while the day or year is still missing, with the preferred month presented and the others
   walked by ArrowDown in the C26 order (`J` → June, ArrowDown → July, then January; `25 ju` → `25 June …`,
   AC-12, AC-23), and becomes `ambiguous` once a year makes those readings complete.
-- **A-3** `defaultValue` is written verbatim into the text field (normally the empty string) and then
-  reparsed like any other value; if it is a complete date, the date input is filled from it per FR-27,
-  otherwise the date input stays empty.
+- **A-3** `defaultValue` is written verbatim into the text field on a blur reset or an Esc with nothing
+  committed (normally the empty string) and then reparsed like any other value; if it is a complete
+  date, the date input is filled from it per FR-27, otherwise the date input stays empty.
 - **A-4** Users are not expected to enter a year-first date, so no year-first entry is parsed and no
   year-first `textFormat` is offered; whatever the field holds re-parses to the reading shown (C12, OQ-2).
 - **A-6** The short-year examples `52` → 2052 and `952` → 1952 assume a range that admits those years
   (an unbounded range, or a `to` bound after 2052). A range ending at a frozen `'now'` in 2026 cannot
   produce 2052; the completion closest to `'now'` is chosen only among the centuries the range leaves
   (FR-13), and if none is left the value is out-of-range (C20).
-- **A-7** Whitespace confirms only the run it terminates. It does not invent digits for missing parts
+- **A-7** Non-Tab whitespace confirms only the run it terminates. It does not invent digits for missing parts
   and does not choose between several month matches; those remain readings for further typing (C22).
 - **A-8** A run is a year only in the year position; a value starting `05` is day 5 (C24). In the year
   position a two-digit run re-parses by FR-13: `05` is 2005 when the range admits it, and 1905 when the
@@ -558,8 +609,8 @@ Questions — answered ones are kept here so the FR references stay stable
 
 | id   | question                                                                                                                                                                                                                                    | decision                                                                                                  | status   |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------- |
-| OQ-1 | Is the little-endian preference really absolute? Applying FR-12 strictly means `52` shows `5 February …` and the middle-endian reading of the same digits never wins while a day-first one survives. Or should middle-endian come back whenever its reading is *more* plausible? | Keep it absolute: preference is not a plausibility vote (the statement says "prefer", and C2 distrusts the examples). With C16/C17, `1225` is cut day-first as 12\|2\|5 → 12 February 2005 | decided  |
+| OQ-1 | Is the little-endian preference really absolute? Applying FR-12 strictly means `32` shows `3 February …` and the middle-endian reading of the same digits never wins while a day-first one survives. Or should middle-endian come back whenever its reading is *more* plausible? | Keep it absolute except for C29's explicit leading-digit hint: preference is not a plausibility vote (the statement says "prefer", and C2 distrusts the examples). With C16/C17, `1225` is cut day-first as 12\|2\|5 → 12 February 2005 | decided  |
 | OQ-2 | `textFormat` with a year-first pattern such as `YYYY-MM-DD` writes a value the parser cannot read back (year-first input is out of scope). Support year-first patterns (and year-first parsing of committed values), or reject such patterns? | Reject; no year-first entry is expected (A-4), a year-first pattern would break FR-17, so `TypeError` at construction | decided  |
 | OQ-3 | (C7 return) What should the feedback explain besides the date? Option A: just the reading and status (`25 May …`). Option B: also why alternatives were dropped (`02-05 dropped: a 1-digit year is impossible`). Option C: B, but only on request (a details element / debug flag). | **A** — reading and status only; the structured result (FR-22) carries the detail, and the live region stays quiet | decided  |
-| OQ-4 | C11's "default" — is it the text field's value (reset to `defaultValue` string, as specified in FR-25) or only the component's resolved date (text left as typed)?                                                                          | Reset both: the text field to `defaultValue` on blur, and the date input emptied whenever the text does not resolve to exactly one date, not only on blur | decided  |
-| OQ-5 | A `YY` token always sits in the year position, so the written value re-parses by FR-13 (C24, A-8): with `MM-DD-YY`, `05-05-05` re-parses as 5 May 2005 when that year is preferred, or as the closest in-range year otherwise. That is correct while the confirmed date is that preferred year. But AC-19 lets the user select a non-preferred century (1905 under `1900-01-01 … now`); writing `05-05-05` would re-parse as 2005, so the text would no longer describe the confirmed 1905. What should commit do in that case? (A) fall back to the four-digit year or FR-20 display text for that commit; (B) write the `YY` pattern anyway and accept that the text re-parses to the preferred century; (C) reject `YY` patterns at construction, or reject confirmation of a non-preferred century when `YY` is configured; (D) something else. | Open — parsing a `YY` value is settled by C24/A-8; only the commit/rewrite behaviour for a selected non-preferred century needs a decision | open |
+| OQ-4 | C11's "default" — is it the text field's value (reset to `defaultValue` string, as specified in FR-25) or only the component's resolved date (text left as typed)?                                                                          | Reset both when blur resets an unresolved value: the text field to `defaultValue` and the date input cleared. C27 later makes a confirmable value commit instead of resetting | decided  |
+| OQ-5 | A `YY` token always sits in the year position, so the written value re-parses by FR-13 (C24, A-8): with `MM-DD-YY`, `05-05-05` re-parses as 5 May 2005 when that year is preferred, or as the closest in-range year otherwise. That is correct while the confirmed date is that preferred year. But AC-19 lets the user select a non-preferred century (1905 under `1900-01-01 … now`); writing `05-05-05` would re-parse as 2005, so the text would no longer describe the confirmed 1905. What should commit do in that case? (A) fall back to the four-digit year or FR-20 display text for that commit; (B) write the `YY` pattern anyway and accept that the text re-parses to the preferred century; (C) reject `YY` patterns at construction, or reject confirmation of a non-preferred century when `YY` is configured; (D) something else. | **A** — render the pattern and re-parse it; if it does not describe the confirmed date, use FR-20 display text for that commit instead. Parsing a `YY` value remains governed by C24/A-8 (C27, FR-24, AC-28) | decided  |

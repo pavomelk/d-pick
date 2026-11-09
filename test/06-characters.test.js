@@ -60,3 +60,19 @@ test('AC-14: unmatched letters stay in the field but make the value invalid', ()
   assert.equal(feedback.textContent, 'Not enough information');
   assert.equal(feedback.getAttribute('data-status'), 'invalid');
 });
+
+test('C28: Tab is never inserted and keeps native focus movement', () => {
+  const { textInput } = setup();
+  const insert = textInput.type('\t');
+  assert.equal(insert.defaultPrevented, true);
+  assert.equal(textInput.value, '');
+
+  const key = textInput.key('Tab');
+  assert.equal(key.defaultPrevented, false);
+});
+
+test('C28: tabs are stripped from pasted text, not treated as boundaries', () => {
+  const { textInput } = setup();
+  textInput.paste('25\t5\t2024');
+  assert.equal(textInput.value, '2552024');
+});

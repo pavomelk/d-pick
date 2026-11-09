@@ -10,10 +10,12 @@ import { base } from './helpers/options.js';
 const p = (value, overrides) => parse(value, base(overrides));
 
 test('FR-12: a surviving little-endian reading suppresses every middle-endian one', () => {
-  const result = p('52');
-  assert.equal(result.status, 'partial');
-  assert.equal(result.text, '5 February …');
+  // `12` can still be day 12 or month 12; the day-first reading wins.
+  const result = p('12');
+  assert.equal(result.status, 'undetermined');
+  assert.equal(result.text, 'Not enough information');
   assert.equal(result.readings.length, 1);
+  assert.equal(result.readings[0].day, 12);
   assert.ok(result.readings.every((reading) => reading.endianness === 'little'));
 
   // `25` is the day 25 with the month still missing: commitment forbids also
@@ -47,11 +49,40 @@ test('FR-12/C16: the first plausible day is the one that is committed', () => {
 });
 
 test('FR-12: middle-endian appears only once every little-endian reading is gone', () => {
-  // Day-first would need the year `52`, and no year in 1972…2026 ends in 52.
+  // The leading 5 also selects month-first under C29.
   const result = p('5252');
   assert.equal(result.endianness, 'middle');
   assert.equal(result.date, '2002-05-25');
   assert.ok(result.readings.every((reading) => reading.endianness === 'middle'));
+});
+
+test('C29: a leading 4–9 forces month-first, except after a month name', () => {
+  const monthOnly = p('5');
+  assert.equal(monthOnly.status, 'partial');
+  assert.equal(monthOnly.text, 'May');
+  assert.equal(monthOnly.endianness, 'middle');
+
+  const partial = p('52');
+  assert.equal(partial.status, 'partial');
+  assert.equal(partial.text, 'May 2 …');
+  assert.equal(partial.endianness, 'middle');
+
+  const separated = p('4/5/2024');
+  assert.equal(separated.status, 'complete');
+  assert.equal(separated.text, 'April 5, 2024');
+  assert.equal(separated.date, '2024-04-05');
+  assert.equal(separated.endianness, 'middle');
+
+  // A leading 0–3 keeps the usual little-endian preference.
+  assert.equal(p('25').status, 'undetermined');
+  assert.equal(p('31/5/2024').text, '31 May 2024');
+  assert.equal(p('04/05/2024').text, '4 May 2024');
+
+  // An explicit month name overrides the digit hint.
+  const named = p('4 May 2024');
+  assert.equal(named.status, 'complete');
+  assert.equal(named.text, '4 May 2024');
+  assert.equal(named.endianness, 'little');
 });
 
 test('FR-12: an impossible little-endian reading lets middle-endian through', () => {
@@ -71,7 +102,7 @@ test('FR-14: one preferred reading that is missing its year is partial', () => {
 });
 
 test('FR-14: a reading missing a whole part is not presented as a date', () => {
-  const result = p('5');
+  const result = p('2');
   assert.equal(result.status, 'undetermined');
   assert.equal(result.date, null);
   assert.ok(result.readings.every((reading) => reading.month == null || reading.day == null));

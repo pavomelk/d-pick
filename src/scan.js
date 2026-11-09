@@ -1,14 +1,14 @@
 // Value → segments (FR-2, FR-4).
 //
 // A segment is a maximal run of digits or of letters. Separators — `.`, `-`,
-// `/`, `,` and whitespace — end a segment, and so does every digit↔letter
+// `/`, `,` and non-Tab whitespace — end a segment, and so does every digit↔letter
 // transition. Separators are hard boundaries: they also close the run they
 // follow, which is why only a value with no separator may be split freely
-// (FR-6).
+// (FR-6). Tab is a navigation key, not content (C28).
 
 const DIGIT = /[0-9]/;
 const LETTER = /[A-Za-z]/;
-const SEPARATORS = new Set([' ', '\t', '\n', '\r', '\f', '\v', '.', '-', '/', ',']);
+const SEPARATORS = new Set([' ', '\n', '\r', '\f', '\v', '.', '-', '/', ',']);
 
 export function scan(rawValue) {
   const value = rawValue == null ? '' : String(rawValue);

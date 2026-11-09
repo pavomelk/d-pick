@@ -9,28 +9,29 @@ import { base } from './helpers/options.js';
 
 const p = (value, overrides) => parse(value, base(overrides));
 
-test('AC-1 … AC-5: the month-first walkthrough holds once day-first runs out', () => {
+test('AC-1 … AC-5: a leading 4–9 selects the month-first walkthrough (C29)', () => {
   const one = p('5');
-  assert.equal(one.status, 'undetermined');
-  assert.equal(one.text, 'Not enough information');
+  assert.equal(one.status, 'partial');
+  assert.equal(one.text, 'May');
   assert.equal(one.date, null);
+  assert.equal(one.endianness, 'middle');
 
   const two = p('52');
   assert.equal(two.status, 'partial');
-  assert.equal(two.text, '5 February …');
-  assert.equal(two.endianness, 'little');
+  assert.equal(two.text, 'May 2 …');
+  assert.equal(two.endianness, 'middle');
 
-  // Day 5 is committed, so the rest is month 2 and a short year 5 (2005).
+  // The leading 5 is the month, so 25 is the day and the year is still open.
   const three = p('525');
-  assert.equal(three.status, 'complete');
-  assert.equal(three.text, '5 February 2005');
-  assert.equal(three.endianness, 'little');
+  assert.equal(three.status, 'partial');
+  assert.equal(three.text, 'May 25 …');
+  assert.equal(three.endianness, 'middle');
 
-  // Day-first cannot read `52` as a year (no year in 1972…2026 ends in 52), so
-  // the month-first reading is the one left standing.
+  // `2` is the year 02: 1902 is out of range, so 2002.
   const four = p('5252');
   assert.equal(four.status, 'complete');
   assert.equal(four.text, 'May 25, 2002');
+  assert.equal(four.date, '2002-05-25');
   assert.equal(four.endianness, 'middle');
 
   const five = p('52524');
@@ -38,6 +39,7 @@ test('AC-1 … AC-5: the month-first walkthrough holds once day-first runs out',
   assert.equal(five.text, 'May 25, 2024');
   assert.equal(five.date, '2024-05-25');
   assert.equal(five.readings.length, 1);
+  assert.equal(five.endianness, 'middle');
 });
 
 test('AC-6 … AC-10: five digits resolve to a little-endian date', () => {
@@ -132,7 +134,7 @@ test('FR-2: whitespace around the value is ignored, separators inside are not', 
   assert.equal(padded.text, '25 May 2024');
 });
 
-test('FR-6: separators are interchangeable, whitespace included', () => {
+test('FR-6: separators are interchangeable, space included', () => {
   for (const value of [
     '25.5.2024',
     '25-5-2024',
@@ -140,7 +142,6 @@ test('FR-6: separators are interchangeable, whitespace included', () => {
     '25 5 2024',
     '25.5/2024',
     '25 - 5 - 2024',
-    '25\t5\t2024',
   ]) {
     const result = p(value);
     assert.equal(result.status, 'complete', value);
@@ -155,8 +156,8 @@ test('C16: the assumed order is committed, one digit at a time', () => {
   assert.equal(p('12').status, 'undetermined');
   assert.equal(p('122').text, '12 February …');
   assert.equal(p('1225').date, '2005-02-12');
-  // A single digit that cannot start a valid day keeps the part open.
-  assert.equal(p('52').text, '5 February …');
+  // A two-digit run that is not a valid day takes only its first digit.
+  assert.equal(p('32').text, '3 February …');
   assert.equal(p('112').text, '11 February …');
 });
 
@@ -174,11 +175,17 @@ test('C16: a space or a leading zero steers the same digits', () => {
 test('C17: a short year is a year number completed to the nearest century', () => {
   // `5` is 05: 1905 and 2005 are the candidates, and 2005 is in range.
   assert.equal(p('1225').text, '12 February 2005');
-  assert.equal(p('525').text, '5 February 2005');
+  assert.equal(p('325').text, '3 February 2005');
   // In year position: `95` is 1995, `952` is 1952, both nearest to today.
   assert.equal(p('25 5 95').date, '1995-05-25');
   assert.equal(p('25 5 952', { range: { from: '1900-01-01', to: 'now' } }).date, '1952-05-25');
   // A run that no in-range year ends with stays an unfinished year instead.
   assert.equal(p('25 May 202').status, 'partial');
   assert.equal(p('25 May 202').text, '25 May 202…');
+});
+
+test('C28: Tab is not a separator', () => {
+  const result = p('25\t5\t2024');
+  assert.equal(result.status, 'invalid');
+  assert.deepEqual(result.readings, []);
 });

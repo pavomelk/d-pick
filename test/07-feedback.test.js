@@ -48,7 +48,7 @@ test('FR-20/FR-22: spans and parts describe the presented reading only', () => {
 test('FR-21: every status is reachable and machine readable', () => {
   assert.equal(p('').status, 'empty');
   assert.equal(p('   ').status, 'empty');
-  assert.equal(p('5').status, 'undetermined');
+  assert.equal(p('2').status, 'undetermined');
   assert.equal(p('255').status, 'partial');
   assert.equal(p('25524').status, 'complete');
   assert.equal(p('5/5/05', { range: { from: '1900-01-01', to: 'now' } }).status, 'ambiguous');
@@ -69,7 +69,7 @@ test('FR-21: an empty value has no reading at all', () => {
 });
 
 test('FR-20: undetermined and invalid values are "Not enough information"', () => {
-  for (const value of ['5', '255/24']) {
+  for (const value of ['2', '255/24']) {
     const result = p(value);
     assert.equal(result.text, 'Not enough information', value);
     assert.equal(result.date, null, value);
