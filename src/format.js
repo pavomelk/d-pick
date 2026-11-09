@@ -43,7 +43,7 @@ export function formatReading(reading) {
 }
 
 const TOKEN_LENGTHS = { d: [1, 2], m: [1, 4], y: [2, 4] };
-const PATTERN_SEPARATORS = new Set([' ', '\t', '\n', '.', '-', '/', ',']);
+const PATTERN_SEPARATORS = new Set([' ', '\n', '.', '-', '/', ',']);
 const LETTER = /[A-Za-z]/;
 
 /**

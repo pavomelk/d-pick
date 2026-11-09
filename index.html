@@ -31,15 +31,23 @@
           <p class="hint">
             Type a date in any order the parser can read (<code>25524</code>,
             <code>25/5/2024</code>, <code>May 25, 2024</code>). <kbd>↓</kbd>/<kbd>↑</kbd> walk the
+<<<<<<< Updated upstream
             readings, <kbd>Enter</kbd> confirms, and leaving the field resets a value that is not a
             full date.
+=======
+            readings, <kbd>Enter</kbd> or leaving the field confirms a reading the parser can resolve,
+            and <kbd>Esc</kbd> cancels the edit. Leaving with an unfinished value resets it, and
+            <kbd>Tab</kbd> moves focus without entering the field. A month prefix is shown as soon as
+            it is determined: <code>N</code> gives November, while <code>J</code> starts at June and
+            <kbd>↓</kbd> walks July and January.
+>>>>>>> Stashed changes
           </p>
           <p class="hint">
             The cut is committed as you type, so a separator or a leading zero is how you steer it:
             <code>1225</code> is day 12, month 2, year 2005, while <code>1 2 25</code> is day 1,
             month 2, year 2025 and <code>02305</code> is day 02, month 3, year 05. Separators
             (<code>.</code> <code>/</code> <code>-</code> <code>,</code> and spaces) are
-            interchangeable.
+            interchangeable; <kbd>Tab</kbd> is not one of them.
           </p>
         </div>
 

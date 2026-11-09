@@ -122,7 +122,7 @@ test('FR-2: whitespace around the value is ignored, separators inside are not', 
   assert.equal(padded.text, '25 May 2024');
 });
 
-test('FR-6: separators are interchangeable, whitespace included', () => {
+test('FR-6: separators are interchangeable, space included', () => {
   for (const value of [
     '25.5.2024',
     '25-5-2024',
@@ -130,7 +130,6 @@ test('FR-6: separators are interchangeable, whitespace included', () => {
     '25 5 2024',
     '25.5/2024',
     '25 - 5 - 2024',
-    '25\t5\t2024',
   ]) {
     const result = p(value);
     assert.equal(result.status, 'complete', value);
@@ -171,4 +170,10 @@ test('C17: a short year is a year number completed to the nearest century', () =
   // A run that no in-range year ends with stays an unfinished year instead.
   assert.equal(p('25 May 202').status, 'partial');
   assert.equal(p('25 May 202').text, '25 May 202…');
+});
+
+test('C28: Tab is not a separator', () => {
+  const result = p('25\t5\t2024');
+  assert.equal(result.status, 'invalid');
+  assert.deepEqual(result.readings, []);
 });

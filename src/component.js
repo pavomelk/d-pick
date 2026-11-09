@@ -8,8 +8,8 @@ import { isValidDate, isoOf, parseIsoDate } from './dates.js';
 import { compilePattern, MONTH_NAMES, renderPattern, selectReading } from './format.js';
 import { normaliseNow, parse, resolveRange } from './parse.js';
 
-const ALLOWED_INSERTION = /^[0-9A-Za-z.\-/, \t\n\r\f\v]*$/;
-const DISALLOWED_CHARACTERS = /[^0-9A-Za-z.\-/, \t\n\r\f\v]/g;
+const ALLOWED_INSERTION = /^[0-9A-Za-z.\-/, \n\r\f\v]*$/;
+const DISALLOWED_CHARACTERS = /[^0-9A-Za-z.\-/, \n\r\f\v]/g;
 const DEFAULT_MAX_READINGS = 8;
 
 let instanceCount = 0;
@@ -40,6 +40,7 @@ export function createIncrementalDateParser(options = {}) {
   let selectedIndex = 0;
   let result = parse(textInput.value, parseOptions);
   let current = selectReading(result, 0);
+  let lastCommittedText = null;
   let destroyed = false;
 
   function manageAttribute(element, name, value) {
@@ -143,15 +144,30 @@ export function createIncrementalDateParser(options = {}) {
     return iso;
   }
 
-  function applyDate(iso) {
+  function displayText(date, endianness) {
+    const day = String(date.day);
+    const month = MONTH_NAMES[date.month - 1];
+    const year = String(date.year);
+    return endianness === 'middle' ? `${month} ${day}, ${year}` : `${day} ${month} ${year}`;
+  }
+
+  function commitText(date, iso, endianness) {
+    if (pattern) {
+      const candidate = renderPattern(pattern, date);
+      const reparsed = parse(candidate, parseOptions);
+      // A `YY` pattern cannot carry a non-preferred century (OQ-5 A): write
+      // display text instead so the field still re-parses to the same date.
+      if (reparsed.status === 'complete' && reparsed.date === iso) return candidate;
+    }
+    return displayText(date, endianness);
+  }
+
+  function applyDate(iso, endianness = null) {
     const date = parseIsoDate(iso);
     if (!date) return false;
 
-    writeText(
-      pattern
-        ? renderPattern(pattern, date)
-        : `${date.day} ${MONTH_NAMES[date.month - 1]} ${date.year}`,
-    );
+    writeText(commitText(date, iso, endianness));
+    lastCommittedText = textInput.value;
 
     selectedIndex = 0;
     result = parse(textInput.value, parseOptions);
@@ -180,6 +196,15 @@ export function createIncrementalDateParser(options = {}) {
   function onKeyDown(event) {
     if (destroyed) return;
 
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      writeText(lastCommittedText == null ? defaultValue : lastCommittedText);
+      selectedIndex = 0;
+      result = parse(textInput.value, parseOptions);
+      render();
+      return;
+    }
+
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       const count = current.readings.length;
       if (!current.navigable || count < 2) return;
@@ -197,14 +222,22 @@ export function createIncrementalDateParser(options = {}) {
     const iso = confirmableDate();
     if (!iso) return;
     event.preventDefault();
-    applyDate(iso);
+    applyDate(iso, current.endianness);
   }
 
   function onBlur() {
     if (destroyed) return;
-    if (current.status === 'complete' || current.status === 'empty') return;
+    if (current.status === 'empty') return;
+    if (textInput.value === lastCommittedText) return;
 
-    // A value that is not unambiguously interpreted resets (FR-25, C11).
+    // Blur commits exactly what Enter would confirm (FR-25, C27).
+    const iso = confirmableDate();
+    if (iso) {
+      applyDate(iso, current.endianness);
+      return;
+    }
+
+    // Anything Enter cannot confirm resets (FR-25, C11).
     writeText(defaultValue);
     selectedIndex = 0;
     result = parse(textInput.value, parseOptions);
