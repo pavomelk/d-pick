@@ -137,14 +137,13 @@ test('FR-30/AC-31: short years emphasize the suffix and partial years their pref
     '<em>25</em>&nbsp;<em>May</em>&nbsp;<em>202</em>…',
   );
   assert.equal(p('25 Sep').highlighted, '<em>25</em>&nbsp;<em>Sep</em>tember&nbsp;…');
-  assert.equal(p('5').highlighted, '<em>5</em>(May)');
 });
 
 test('FR-30/AC-31: the selected reading supplies the highlighted date', () => {
   const result = parse('5/5/05', { range: { from: '1900-01-01', to: 'now' }, now: '2026-11-04' });
   assert.equal(
     selectReading(result, 1).highlighted,
-    '<em>5</em>(May)&nbsp;<em>5</em>,&nbsp;19<em>05</em>',
+    '<em>5</em>&nbsp;<em>5</em>(May)&nbsp;19<em>05</em>',
   );
 });
 

@@ -17,7 +17,7 @@ const R_1990_2010 = { range: { from: '1990-01-01', to: '2010-12-31' }, now: NOW 
 test('FR-13: every in-range century survives, the one closest to today first', () => {
   const result = parse('5/5/05', R_1900);
   assert.equal(result.status, 'ambiguous');
-  assert.equal(result.text, 'May 5, 2005');
+  assert.equal(result.text, '5 May 2005');
   assert.deepEqual(
     result.readings.map((reading) => reading.iso),
     ['2005-05-05', '1905-05-05'],
@@ -30,7 +30,7 @@ test('FR-13/FR-20: the selected alternative is marked in the feedback', () => {
   const result = parse('5/5/05', R_1900);
   const selected = selectReading(result, 1);
   assert.equal(selected.index, 1);
-  assert.equal(selected.text, 'May 5, 1905 (2 of 2)');
+  assert.equal(selected.text, '5 May 1905 (2 of 2)');
   assert.equal(selected.date, '1905-05-05');
   assert.equal(result.readings[1].iso, '1905-05-05');
 });
@@ -39,7 +39,7 @@ test('FR-13: a century outside the range is dropped instead of offered', () => {
   const result = parse('5/5/05', R_1900_1940);
   assert.equal(result.status, 'complete');
   assert.equal(result.date, '1905-05-05');
-  assert.equal(result.text, 'May 5, 1905');
+  assert.equal(result.text, '5 May 1905');
 });
 
 test('FR-13: no century in range eliminates the candidate outright', () => {

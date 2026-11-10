@@ -22,16 +22,16 @@ The lower and upper bounds may each be left undefined or set to `'now'`, meaning
 
 For the examples below, the date range is `('1972-02-05', 'now')`.
 
-### Example 1: Month-First Input
+### Example 1: Input That Eventually Resolves Month-First
 
-A leading `5` is enough to assume the month-first interpretation: the user is entering month 5 (May). Each row shows the next character typed and the value entered so far.
+The first digit does not choose the interpretation by itself. Day-first is preferred until it can no longer explain the input; then the remaining month-first reading wins. Each row shows the next character typed and the value entered so far.
 
 | Next character | Value so far | Feedback |
 | --- | --- | --- |
-| `5` | `5` | May — month 5 is assumed as the first part |
-| `2` | `52` | May 2 … |
-| `5` | `525` | May 25 … |
-| `2` | `5252` | May 25, 2002 — year 52 resolves within the allowed range |
+| `5` | `5` | Not enough information — day 5 with the month still missing |
+| `2` | `52` | 5 February … — day 5 is committed, so month 2 follows |
+| `5` | `525` | 5 February 2005 — day 5, month 2, year 5 resolves to 2005 |
+| `2` | `5252` | May 25, 2002 — day-first would need year 52, which is outside the allowed range |
 | `4` | `52524` | May 25, 2024 — parsing complete, date identified |
 
 ### Example 2: Day-First Input

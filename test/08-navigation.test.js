@@ -26,20 +26,20 @@ test('FR-15: the list is best-first and says whether it can be walked', () => {
 test('FR-15: ArrowDown/ArrowUp walk the list, wrap, and never touch the text', () => {
   const { textInput, feedback } = setup(R_1900);
   textInput.type('5/5/05');
-  assert.equal(feedback.textContent, 'May 5, 2005');
+  assert.equal(feedback.textContent, '5 May 2005');
 
   textInput.key('ArrowDown');
-  assert.equal(feedback.textContent, 'May 5, 1905 (2 of 2)');
+  assert.equal(feedback.textContent, '5 May 1905 (2 of 2)');
   assert.equal(textInput.value, '5/5/05');
 
   textInput.key('ArrowDown');
-  assert.equal(feedback.textContent, 'May 5, 2005');
+  assert.equal(feedback.textContent, '5 May 2005');
 
   textInput.key('ArrowUp');
-  assert.equal(feedback.textContent, 'May 5, 1905 (2 of 2)');
+  assert.equal(feedback.textContent, '5 May 1905 (2 of 2)');
 
   textInput.key('ArrowUp');
-  assert.equal(feedback.textContent, 'May 5, 2005');
+  assert.equal(feedback.textContent, '5 May 2005');
 });
 
 test('C25: ArrowDown walks an ambiguous month prefix from June to July', () => {
@@ -108,7 +108,7 @@ test('FR-15: navigation is off above maxReadings, so the key stays native', () =
   const { textInput, feedback } = setup({ ...R_1900, maxReadings: 1 });
   textInput.type('5/5/05');
   const event = textInput.key('ArrowDown');
-  assert.equal(feedback.textContent, 'May 5, 2005');
+  assert.equal(feedback.textContent, '5 May 2005');
   assert.equal(event.defaultPrevented, false);
 });
 
@@ -126,7 +126,7 @@ test('FR-22: onReadingChange follows the selection', () => {
   textInput.key('ArrowDown');
   assert.equal(readingChanges.length, before + 1);
   assert.equal(readingChanges.at(-1).index, 1);
-  assert.equal(readingChanges.at(-1).text, 'May 5, 1905 (2 of 2)');
+  assert.equal(readingChanges.at(-1).text, '5 May 1905 (2 of 2)');
 });
 
 test('FR-16: Enter confirms a complete reading and rewrites the field', () => {
@@ -198,18 +198,18 @@ test('AC-19: Enter confirms the reading ArrowDown selected', () => {
   textInput.key('Enter');
   assert.deepEqual(confirmed, ['1905-05-05']);
   assert.equal(dateInput.value, '1905-05-05');
-  assert.equal(textInput.value, 'May 5, 1905');
+  assert.equal(textInput.value, '5 May 1905');
 });
 
 test('FR-16: a fresh text change puts the selection back on the preferred reading', () => {
   const { textInput, feedback } = setup(R_1900);
   textInput.type('5/5/05');
   textInput.key('ArrowDown');
-  assert.equal(feedback.textContent, 'May 5, 1905 (2 of 2)');
+  assert.equal(feedback.textContent, '5 May 1905 (2 of 2)');
   textInput.backspace();
   assert.equal(textInput.value, '5/5/0');
   // `0` is the year 00 → 2000, so the value is complete again on one reading
   // and the marker of the previous selection is gone.
-  assert.equal(feedback.textContent, 'May 5, 2000');
+  assert.equal(feedback.textContent, '5 May 2000');
   assert.equal(feedback.textContent.includes('of '), false);
 });

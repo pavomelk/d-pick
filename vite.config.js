@@ -1,7 +1,5 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
-  base: process.env.NODE_ENV === 'production'
-    ? '/d-pick/'
-    : '/'
-});
+export default defineConfig(({ command, isPreview }) => ({
+  base: command === 'build' || isPreview ? '/d-pick/' : '/',
+}));

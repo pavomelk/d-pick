@@ -147,7 +147,7 @@ test('AC-28: a YY commit falls back to display text for another century', () => 
   textInput.key('ArrowDown');
   textInput.blur();
   assert.deepEqual(confirmed, ['1905-05-05']);
-  assert.equal(textInput.value, 'May 5, 1905');
+  assert.equal(textInput.value, '5 May 1905');
   assert.equal(dateInput.value, '1905-05-05');
   assert.equal(parse(textInput.value, base({ range })).date, '1905-05-05');
 });
@@ -161,7 +161,7 @@ test('C30: blur confirms an alternative kept selected by a separator', () => {
 
   textInput.blur();
   assert.deepEqual(confirmed, ['1905-05-05']);
-  assert.equal(textInput.value, 'May 5, 1905');
+  assert.equal(textInput.value, '5 May 1905');
   assert.equal(dateInput.value, '1905-05-05');
 });
 

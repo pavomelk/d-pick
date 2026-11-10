@@ -29,22 +29,11 @@ const PART_CAP = { day: 2, month: 2, year: 4 };
 export function readingsFor(scanned, range) {
   if (!scanned.ok || scanned.empty) return [];
 
-  // A leading unpadded 4–9 is the user's month-first hint (C29). A month name
-  // anywhere in the value overrides it, as does a first digit 0–3.
-  const hinted = hintedEndianness(scanned);
   const readings = [];
-  for (const endianness of hinted ? [hinted] : ['little', 'middle']) {
+  for (const endianness of ['little', 'middle']) {
     readings.push(...readSegments(scanned.segments, endianness, range, scanned.free));
   }
   return readings;
-}
-
-function hintedEndianness(scanned) {
-  if (scanned.segments.some((segment) => segment.kind === 'letter')) return null;
-  const first = scanned.segments[0];
-  if (!first || first.kind !== 'digit') return null;
-  const digit = first.text[0];
-  return digit >= '4' && digit <= '9' ? 'middle' : null;
 }
 
 // A bare `J` is ambiguous between January, June and July. The clarified order
