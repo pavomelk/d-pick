@@ -33,6 +33,11 @@ h2 {
   margin: 0 0 1rem;
 }
 
+.range {
+  margin: 0 0 1.25rem;
+}
+
+.range label,
 .entry label {
   display: block;
   font-weight: 600;
@@ -46,6 +51,7 @@ h2 {
   flex-wrap: wrap;
 }
 
+.range input,
 .fields input {
   font: inherit;
   padding: 0.45rem 0.6rem;
@@ -55,6 +61,7 @@ h2 {
   color: inherit;
 }
 
+#date-range,
 #date-text {
   min-width: 16rem;
 }
@@ -115,6 +122,12 @@ button:hover {
 .hint {
   font-size: 0.9rem;
   opacity: 0.8;
+}
+
+.hint[data-status="error"] {
+  opacity: 1;
+  text-decoration: underline wavy currentColor;
+  text-decoration-skip-ink: none;
 }
 
 kbd {

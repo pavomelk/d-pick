@@ -14,6 +14,23 @@
       </p>
 
       <section id="demo" aria-label="Parser demo">
+        <div class="range">
+          <label for="date-range">Allowed range</label>
+          <input
+            id="date-range"
+            type="text"
+            placeholder="1672-02-05..now"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <p class="hint">
+            Enter <code>from..to</code> (ISO dates or <code>now</code>; leave a side blank for no
+            bound), or paste a JSON range option such as
+            <code>{"from":"1972-02-05","to":"now"}</code>. Applied when the field loses focus.
+          </p>
+          <p id="range-status" class="hint" aria-live="polite"></p>
+        </div>
+
         <div class="entry">
           <label for="date-text">Date</label>
           <div class="fields">

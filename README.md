@@ -106,7 +106,7 @@ The structured result includes `status`, `date`, `endianness`, `parts`, `spans`,
 
 The demo is published with GitHub Pages at [https://pavomelk.github.io/d-pick/](https://pavomelk.github.io/d-pick/).
 
-`index.html` is a Vite-served demo that imports the source modules directly. It renders the feedback text, the highlighted suggestion, and the full structured result.
+`index.html` is a Vite-served demo that imports the source modules directly. It renders the feedback text, the highlighted suggestion, and the full structured result. A free-text allowed-range field near the top (`from..to`, or a JSON `{ from, to }` object) is applied on blur.
 
 To run it locally:
 
