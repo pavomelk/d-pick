@@ -70,7 +70,7 @@ test('FR-21: an empty value has no reading at all', () => {
 });
 
 test('FR-20: undetermined and invalid values are "Not enough information"', () => {
-  for (const value of ['2', '255/24']) {
+  for (const value of ['2', '25/345']) {
     const result = p(value);
     assert.equal(result.text, 'Not enough information', value);
     assert.equal(result.date, null, value);

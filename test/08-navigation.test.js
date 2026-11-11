@@ -94,6 +94,19 @@ test('C30: an accepted alternative keeps a short year open while it is typed', (
   assert.equal(feedback.textContent, 'January 4, 2012 (3 of 3)');
 });
 
+test('C32: a separator accepts the current suggestion, not only an alternative', () => {
+  const { textInput, dateInput, feedback } = setup();
+  textInput.type('34');
+  assert.equal(feedback.textContent, '3 April …');
+
+  textInput.type(' ');
+  assert.equal(feedback.textContent, '3 April …');
+
+  textInput.type('2');
+  assert.equal(feedback.textContent, '3 April 2002');
+  assert.equal(dateInput.value, '2002-04-03');
+});
+
 test('C30: a digit typed without a separator still resets to the preferred reading', () => {
   const { textInput, feedback } = setup();
   textInput.type('J');
@@ -179,7 +192,7 @@ test('FR-16: Enter confirms nothing when no single complete date can be formed',
   const cases = [
     ['J', undefined],
     ['25 ju', undefined],
-    ['255/24', undefined],
+    ['25/345', undefined],
     ['31122019', { range: { from: '2020-01-01', to: '2020-12-31' } }],
   ];
   for (const [value, overrides] of cases) {

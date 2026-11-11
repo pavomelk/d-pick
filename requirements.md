@@ -1,8 +1,8 @@
 # Requirements — Incremental Segmented Date Parser
 
-Status: **v0.8 — frozen for implementation.** v0.1 (from `problem_statement.md`) revised against the
-clarifications in §10; OQ-1 … OQ-5 and the C14–C31 review decisions are decided (§11).
-Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C31 (§10).
+Status: **v0.9 — frozen for implementation.** v0.1 (from `problem_statement.md`) revised against the
+clarifications in §10; OQ-1 … OQ-5 and the C14–C32 review decisions are decided (§11).
+Sources: [`problem_statement.md`](problem_statement.md), clarifications C1–C32 (§10).
 Notation: **C#** clarification (§10) · **AC-#** acceptance scenario (§5) · **OQ-#** question (§11) · **A-#** assumption (§11).
 
 Priorities: **MUST** = needed for the first working version · **SHOULD** = expected, unless clearly too costly · **MAY** = optional.
@@ -91,13 +91,14 @@ Non-goals for v1
   (`Ju` + space still has June and July as readings, with June preferred and ArrowDown reaching July),
   and the typed text is not rewritten (FR-5).
 - **FR-4 (MUST)** Segments end at a digit↔letter transition and at every separator (`.` `-` `/` `,`
-  and non-Tab whitespace). Separators are **hard boundaries** (C1): once the value contains one, every run between
-  separators is exactly one segment and exactly one part — it is never merged with, or re-split across,
-  a neighbour — so `255/24` cannot become `25|5/24` and has only the two parts `255` and `24`. A comma counts as a boundary as well, so the `MMMM, dd YYYY` display form
+  and non-Tab whitespace). Separators are **hard boundaries** (C1): once the value contains one, every
+  run after the first is exactly one segment and exactly one part — it is never merged with, or re-split
+  across, a neighbour — while the first run keeps the cut the component was already showing (C32). Thus
+  `255/24` is `25|5/24` → 25 May 2024, but the later `345` in `25/345` is not re-split. A comma counts as a boundary as well, so the `MMMM, dd YYYY` display form
   written back into the field parses as three segments (FR-17). A run of separators counts as one, and
-  leading or trailing separators are ignored. Only a value with no separator in it is split freely (FR-6).
-  Non-Tab whitespace is also the confirmation gesture for the run before it (C22); the other separators
-  are only boundaries.
+  leading or trailing separators are ignored. A value with no separator in it, and the first run before
+  a separator, are split freely (FR-6). Non-Tab whitespace is also the confirmation gesture for the run
+  before it (C22); the other separators are only boundaries.
 - **FR-5 (MUST)** The typed value is never rewritten, reformatted, trimmed or reordered while the user is
   typing; only a commit (FR-17) may replace it.
 
@@ -113,10 +114,12 @@ Non-goals for v1
     a committed day or month never changes. A run is read as a year only when the day and month
     positions are already filled: a value starting `05` is day 5 with the month still missing, not the
     year 2005 (C24).
-  - A free digit run therefore yields exactly one cut per endianness; a value with separators yields
-    exactly one part per run (FR-4).
+  - A free digit run therefore yields exactly one cut per endianness. When separators follow, the first
+    run keeps the cut of the reading preferred while it was alone, and each later run supplies exactly
+    one part (FR-4, C32).
   - The user steers the cut with a separator or a leading zero: `1225` and `12 2 5` both read 12|2|5,
-    `1 2 25` reads 1|2|25, and `02305` reads 02|3|05 (AC-22).
+    `1 2 25` reads 1|2|25, and `02305` reads 02|3|05 (AC-22). A separator also accepts the cut the
+    component was showing, so `34` → `3 April …`, `34 ` stays, and `34 2` reads 3|4|2 (C32).
   - No part may repeat or be skipped, and the year part may be absent (day and month may not: a reading
     without both is not a candidate, though FR-14 still exposes the surviving partial reading). An
     explicit month name fixes the month part (FR-3); a month name in the first part position therefore
@@ -184,7 +187,8 @@ Non-goals for v1
   `maxReadings` (default 8) and above that cap the keys behave natively (C14). After `ArrowDown` has
   selected an alternative, a following separator (space, `.`, `-`, `/`, `,`) accepts that selection
   (C30): the selection survives the separator and later insertions, and later input completes the
-  selected alternative instead of the preferred one. A short year that is being typed after acceptance
+  selected alternative instead of the preferred one (C30); a separator also accepts the preferred/current
+  reading when no ArrowDown selection was made (C32). A short year that is being typed after acceptance
   stays open: the selected month and day remain fixed while the year digits move to the next
   completion, until the year run reaches four digits. For an already complete alternative, the
   separator only keeps it selected so blur or Enter commits it; it does not pin a new reading. An
@@ -378,14 +382,14 @@ the range leaves only 2020).
 `25 June …`, with `ArrowDown` switching to `25 July …` (2 of 2); `25 september 2024` → `complete`,
 `25 September 2024`.
 
-**AC-13 — separators are hard boundaries (C1)**
+**AC-13 — runs after the first separator are pinned (C1, C32)**
 
 | value        | status     | reading          | note                                        |
 | ------------ | ---------- | ---------------- | ------------------------------------------- |
 | `25/5/2024`  | `complete` | `25 May 2024`    | one-digit month allowed because `/` closes it |
 | `5.25.2024`  | `complete` | `May 25, 2024`   | little-endian would need month 25 → middle-endian |
 | `25-5-24`    | `complete` | `25 May 2024`    | century from the range (1924 is out)        |
-| `255/24`     | `invalid`  | Not enough information | `255` cannot be re-split across `/`    |
+| `25/345`     | `invalid`  | Not enough information | the later run `345` cannot be a month and is not re-split |
 
 **AC-14 — characters are blocked, not accepted (C9)**: typing `#` leaves the value unchanged; pasting
 `2#5` yields `25`; `xyz` stays in the field but is `invalid` (no month name matches). Tab is never
@@ -496,6 +500,11 @@ space, `4`, space, `1` shows `January 4, 2001 (3 of 3)`; another `2` extends the
 (`25 Sep` → `<em>25</em>&nbsp;<em>Sep</em>tember&nbsp;…`), and message statuses have an empty
 `highlighted` string. The demo renders `highlighted` in a separate element.
 
+**AC-32 — a separator accepts the current suggestion (C32)**: type `34` → `partial`, `3 April …`; a
+space keeps that reading, and `2` then completes `3 April 2002`. `1225` followed by a space stays
+`12 February 2005`. `255/24` is `25 May 2024`, and `312/2024` keeps the middle-endian March 12 reading
+shown for `312` → `March 12, 2024`. Later runs stay pinned: `25/345` is `invalid`.
+
 ## 6. Non-functional requirements
 
 - **NFR-1** No runtime dependency; plain ES modules, no transpiling, no bundling required to use the
@@ -519,8 +528,9 @@ failing test names the requirement it breaks from the first commit (C14).
 
 1. Segmentation per FR-4/FR-6/FR-7: `5`, `05` (day 5, not the year 2005), `52`, `525`, `5252`, `52524`, `2`, `25`, `255`, `2552`,
    `25524`, the committed cut (`112`, `1225`), the steering levers (`12 2 5`, `1 2 25`, `02305`,
-   `2 5 23`), separator-pinned values (`25/5/2024`, `5.25.2024`, `255/24`, trailing `25/`),
-   interchangeable separators (FR-2) and digit↔letter transitions.
+   `2 5 23`), separator-accepted cuts (`34 `, `34 2`, `255/24`, `312/2024`), later pinned runs
+   (`25/5/2024`, `5.25.2024`, `25/345`, trailing `25/`), interchangeable separators (FR-2) and
+   digit↔letter transitions.
 2. Endianness preference (FR-12) and "not enough information" (FR-14), including the AC-2 consequence.
 3. Range elimination (FR-11) for readings and unfinished years; bounds `undefined`/`'now'`/ISO; `'now'`
    frozen (FR-18); invalid ranges.
@@ -534,8 +544,8 @@ failing test names the requirement it breaks from the first commit (C14).
    treated as a separator (C28, AC-27); unmatched letters → `invalid`.
 7. Status vocabulary and feedback text (FR-20, FR-21), including `Date out of range`, ellipsis positions,
    selected-reading marker; highlighted suggestions (FR-30, AC-31).
-8. Reading list order and ArrowDown/ArrowUp cycling, cap (FR-15); separator-accepted alternatives
-   (C30, AC-30); Enter confirmation matrix (FR-16).
+8. Reading list order and ArrowDown/ArrowUp cycling, cap (FR-15); separator-accepted alternatives and
+   current readings (C30, C32, AC-30, AC-32); Enter confirmation matrix (FR-16).
 9. `textFormat` rendering for each token and round-trip re-parse, year-first pattern → `TypeError`
    (FR-24); blur commit, blur reset and Esc cancel with and without `defaultValue`, including a complete
    `defaultValue` re-syncing the date input and the `YY` fallback for a non-preferred century
@@ -573,7 +583,7 @@ failing test names the requirement it breaks from the first commit (C14).
 
 | #   | clarification (as given)                                                                                                                    | decision now normative in the document                                                                                          | requirements                |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| C1  | "User may use separators such as dot, dash or slash and they indeed should mean segment boundaries"                                          | `.`, `-`, `/` and non-Tab whitespace are hard boundaries: every run between them is one part and is never split across a neighbour; commas count as boundaries too, and non-Tab whitespace additionally confirms the preceding guess (C22, C28) | FR-4, AC-13                 |
+| C1  | "User may use separators such as dot, dash or slash and they indeed should mean segment boundaries"                                          | `.`, `-`, `/` and non-Tab whitespace are hard boundaries: every run after the first is one part and is never split across a neighbour; the first run keeps the cut it was showing (C32). Commas count as boundaries too, and non-Tab whitespace additionally confirms the preceding guess (C22, C28) | FR-4, AC-13                 |
 | C2  | "Source example has logical error. It was meant to communicate the idea but happen to be far from perfect"                                    | The worked examples are illustrative only; the year rules (C15, then C17) are normative, the "range" wording is dropped              | FR-10, AC-8                 |
 | C3  | "The century should indeed be assumed to be closest to today"                                                                                | Preferred century = closest in-range century to the frozen `'now'`; other in-range centuries stay as alternatives                 | FR-13, FR-14, AC-19         |
 | C4  | "Date format in the text field should be converted according to the pattern … ('d-m-YYYY', 'MM-DD-YY' etc.) … during parsing and prediction, the guessed text should be presented as 'dd MMMM YYYY' or 'MMMM, dd YYYY'" | `textFormat` token pattern applied on commit only; prediction always uses `dd MMMM YYYY` / `MMMM, dd YYYY`                        | FR-20, FR-24, AC-17         |
@@ -603,6 +613,7 @@ failing test names the requirement it breaks from the first commit (C14).
 | C28 | "Additionally, <Tab> is not a separator (an invalid character) and not supoused to get inserted at all, instead it should allow to move away from the input." | Tab is never inserted or treated as a separator; it keeps native focus movement. Only space/non-Tab whitespace separates or confirms. Tabs in pasted text are stripped, not converted to boundaries | FR-2, FR-3, FR-4, AC-14, AC-27 |
 | C30 | "When auto suggested alternative is displayed following user's 'ArrowDown' presses, and the next user input is separator, this means user accepted that alternative suggestion and his following input will complement that alternative value instead of the initial." / "No, in that case blur should pick up the alternative suggestion. But 'ArrowDown' should cycle-through the alternatives, meaning once the last option is exhausted the next one proposed will be the one that was there initially." | A separator typed after `ArrowDown` accepts the selected alternative: the selection survives the separator and later insertions, and later input extends that alternative instead of the preferred reading. A short year typed after acceptance stays open until four digits (`January 4, 2001` + `2` → `January 4, 2012`, not June). For an already complete alternative (for example a different century), the separator only keeps it selected so blur or Enter commits it. ArrowDown/ArrowUp still wrap, returning to the initially preferred reading after the last alternative. An ordinary edit not accepted by a separator, and a deletion, reset the selection to the preferred reading | FR-15, FR-16, FR-25, AC-19, AC-30 |
 | C31 | "component should produce a string with the suggested date that contains the emphasized matching user input. e.g. if user typed '2 4 52', then string should look like '<em>2</em>&nbsp;<em>4</em>(April)&nbsp;19<em>52</em>.' (if range ends in 2000). Same for letter input: 'ja' -> '<em>Ja</em>nuary'. If user typed month in number, but suggestion is month name, then it should just follow user's original input in brackets. Small letter can be highlighted as capital letter in month name instead of being added as separate letter. Include that output in a separate element's text in the demo." | The structured result exposes `highlighted`: the presented reading with the user's matching digits emphasized, numeric months followed by `(MonthName)`, letter month prefixes emphasized inside the capitalized full name, `&nbsp;` separators and the same ellipsis/comma rules as FR-20. Message statuses have no highlighted date. The demo renders it in a separate element without replacing the accessible feedback | FR-22, FR-30, AC-31 |
+| C32 | "When entering 34 component picks up 3 April (which is correct) but then <space> leads to 'Not enough information'. It should proceed to identifying the year. Generally, once user choses separator, that should mean it is agreeing to component's suggestion and component should continue with that assumption." | A separator accepts the run before it as the cut the component was showing, even when no ArrowDown selection was made. The first run keeps its free split (`34` → `3 April …`, `34 ` stays, `34 2` → `3 April 2002`; `255/24` → `25 May 2024`; `312 2024` keeps the middle-endian March 12). Separators still pin every later run, so `25/345` is invalid | FR-4, FR-6, FR-15, AC-13, AC-32 |
 
 ## 11. Assumptions and questions
 

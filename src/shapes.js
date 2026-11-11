@@ -1,11 +1,12 @@
 // Segments → readings (FR-4 … FR-13).
 //
-// A separator pins the parts: `25/5/2024` is three parts, and a run that does
-// not fit its part is not re-split (`255/24` has two parts and `255` is not a
-// day). A free digit run has no such pins, so it is filled greedily left to
-// right in the assumed order and a part that has taken its digits is never
-// re-split later (C16): two digits whenever they are valid, one only when two
-// would not be — `52` is day 5 + month 2, `1225` is day 12 + month 2 + year 5.
+// A separator keeps the cut the component was showing: `34` shows day 3 +
+// month 4, and a separator accepts that cut (`34 2` is 3 April 2002). That first
+// run is filled greedily left to right in the assumed order, and a part that
+// has taken its digits is never re-split later (C16): two digits whenever they
+// are valid, one only when two would not be — `52` is day 5 + month 2, `1225`
+// is day 12 + month 2 + year 5. Runs after a separator are pinned to one part,
+// so `25/5/2024` is 25|5|2024 and `25/345` is not a date.
 //
 // Readings that differ only by century (a short year, FR-13) or by the month a
 // letter run resolves to (FR-9) are the alternatives the list exposes.
@@ -30,10 +31,26 @@ export function readingsFor(scanned, range) {
   if (!scanned.ok || scanned.empty) return [];
 
   const readings = [];
+  const firstEndianness =
+    scanned.segments.length === 1
+      ? null
+      : preferredEndiannessFor(scanned.segments[0], range);
+
   for (const endianness of ['little', 'middle']) {
-    readings.push(...readSegments(scanned.segments, endianness, range, scanned.free));
+    const firstRunSpills = firstEndianness === null || endianness === firstEndianness;
+    readings.push(...readSegments(scanned.segments, endianness, range, firstRunSpills));
   }
   return readings;
+}
+
+// The run before the first separator keeps whichever reading was preferred
+// while that run was still alone. This is what makes `312 2024` stay March 12
+// (the middle-endian reading for `312`) instead of becoming invalid or a
+// different day/month pair.
+function preferredEndiannessFor(segment, range) {
+  if (readSegments([segment], 'little', range, true).length > 0) return 'little';
+  if (readSegments([segment], 'middle', range, true).length > 0) return 'middle';
+  return 'little';
 }
 
 // A bare `J` is ambiguous between January, June and July. The clarified order
@@ -58,7 +75,7 @@ function validMonth(value) {
   return value >= 1 && value <= 12;
 }
 
-function readSegments(segments, endianness, range, spill) {
+function readSegments(segments, endianness, range, freeFirst = true) {
   const order = PART_ORDER[endianness];
   const spans = { day: null, month: null, year: null };
   let day = null;
@@ -66,7 +83,7 @@ function readSegments(segments, endianness, range, spill) {
   let yearDigits = null;
   let slot = 0;
 
-  for (const segment of segments) {
+  for (const [segmentIndex, segment] of segments.entries()) {
     if (slot >= order.length) return [];
     const part = order[slot];
 
@@ -81,8 +98,9 @@ function readSegments(segments, endianness, range, spill) {
       continue;
     }
 
-    // Pinned: one segment per part, however long the segment is.
-    if (!spill) {
+    // Runs after a separator are pinned: one segment per part, however long
+    // it is. The first run may keep its free split (C32).
+    if (segmentIndex > 0 || !freeFirst) {
       if (segment.text.length > PART_CAP[part]) return [];
       if (part === 'year') {
         yearDigits = segment.text;
@@ -100,7 +118,7 @@ function readSegments(segments, endianness, range, spill) {
       continue;
     }
 
-    // Free run: fill this part and spill the rest into the next one.
+    // The accepted first run fills the parts it spans.
     let offset = 0;
     while (offset < segment.text.length) {
       if (slot >= order.length) return [];

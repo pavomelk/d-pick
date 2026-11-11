@@ -81,7 +81,7 @@ test('FR-7/FR-22: the structured result exposes parts and digit spans', () => {
   assert.deepEqual(withName.spans, { day: [0, 2], month: [3, 6], year: [7, 11] });
 });
 
-test('AC-13: separators are hard boundaries and are never re-split', () => {
+test('AC-13: runs after the first separator are pinned to one part', () => {
   assert.equal(p('25/5/2024').status, 'complete');
   assert.equal(p('25/5/2024').text, '25 May 2024');
 
@@ -94,10 +94,34 @@ test('AC-13: separators are hard boundaries and are never re-split', () => {
   assert.equal(dashed.status, 'complete');
   assert.equal(dashed.text, '25 May 2024');
 
-  const pinned = p('255/24');
+  const pinned = p('25/345');
   assert.equal(pinned.status, 'invalid');
   assert.equal(pinned.text, 'Not enough information');
   assert.deepEqual(pinned.readings, []);
+});
+
+test('C32: a separator accepts the cut the component was showing', () => {
+  const trailing = p('34 ');
+  assert.equal(trailing.status, 'partial');
+  assert.equal(trailing.text, '3 April …');
+
+  const complete = p('34 2');
+  assert.equal(complete.status, 'complete');
+  assert.equal(complete.text, '3 April 2002');
+  assert.equal(complete.date, '2002-04-03');
+
+  const completeRun = p('1225 ');
+  assert.equal(completeRun.status, 'complete');
+  assert.equal(completeRun.text, '12 February 2005');
+
+  const longRun = p('255/24');
+  assert.equal(longRun.status, 'complete');
+  assert.equal(longRun.text, '25 May 2024');
+
+  const middle = p('312/2024');
+  assert.equal(middle.status, 'complete');
+  assert.equal(middle.text, 'March 12, 2024');
+  assert.equal(middle.endianness, 'middle');
 });
 
 test('FR-4: a trailing separator pins the run but does not join segments', () => {

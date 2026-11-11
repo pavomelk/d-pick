@@ -2,9 +2,9 @@
 //
 // A segment is a maximal run of digits or of letters. Separators — `.`, `-`,
 // `/`, `,` and non-Tab whitespace — end a segment, and so does every digit↔letter
-// transition. Separators are hard boundaries: they also close the run they
-// follow, which is why only a value with no separator may be split freely
-// (FR-6). Tab is a navigation key, not content (C28).
+// transition. Separators close the run they follow; the first run keeps the
+// cut it was showing, while later runs are pinned to one part (FR-4, C32).
+// Tab is a navigation key, not content (C28).
 
 const DIGIT = /[0-9]/;
 const LETTER = /[A-Za-z]/;
@@ -28,7 +28,7 @@ export function scan(rawValue) {
       continue;
     } else {
       // A character the field never accepts (FR-2): no reading can exist.
-      return { value, ok: false, empty: false, segments: [], hasSeparator, free: false };
+      return { value, ok: false, empty: false, segments: [], hasSeparator };
     }
 
     if (!current || current.kind !== kind) {
@@ -40,7 +40,5 @@ export function scan(rawValue) {
   }
 
   const empty = segments.length === 0;
-  const free = !empty && !hasSeparator && segments.length === 1 && segments[0].kind === 'digit';
-
-  return { value, ok: true, empty, segments, hasSeparator, free };
+  return { value, ok: true, empty, segments, hasSeparator };
 }
