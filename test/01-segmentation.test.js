@@ -81,7 +81,7 @@ test('FR-7/FR-22: the structured result exposes parts and digit spans', () => {
   assert.deepEqual(withName.spans, { day: [0, 2], month: [3, 6], year: [7, 11] });
 });
 
-test('AC-13: runs after the first separator are pinned to one part', () => {
+test('AC-13: runs after the first separator start at their own boundary', () => {
   assert.equal(p('25/5/2024').status, 'complete');
   assert.equal(p('25/5/2024').text, '25 May 2024');
 
@@ -94,10 +94,24 @@ test('AC-13: runs after the first separator are pinned to one part', () => {
   assert.equal(dashed.status, 'complete');
   assert.equal(dashed.text, '25 May 2024');
 
-  const pinned = p('25/345');
-  assert.equal(pinned.status, 'invalid');
-  assert.equal(pinned.text, 'Not enough information');
-  assert.deepEqual(pinned.readings, []);
+  const spilled = p('25/345');
+  assert.equal(spilled.status, 'out-of-range');
+  assert.equal(spilled.text, 'Date out of range');
+  assert.deepEqual(spilled.readings, []);
+
+  const spilledInRange = p('25/345', { range: { from: '1900-01-01', to: 'now' } });
+  assert.equal(spilledInRange.status, 'complete');
+  assert.equal(spilledInRange.text, '25 March 1945');
+  assert.equal(spilledInRange.date, '1945-03-25');
+
+  const shortSpill = p('25/13');
+  assert.equal(shortSpill.status, 'complete');
+  assert.equal(shortSpill.text, '25 January 2003');
+
+  const shortInvalid = p('25/0');
+  assert.equal(shortInvalid.status, 'invalid');
+  assert.equal(shortInvalid.text, 'Not enough information');
+  assert.deepEqual(shortInvalid.readings, []);
 });
 
 test('C32: a separator accepts the cut the component was showing', () => {
@@ -122,6 +136,16 @@ test('C32: a separator accepts the cut the component was showing', () => {
   assert.equal(middle.status, 'complete');
   assert.equal(middle.text, 'March 12, 2024');
   assert.equal(middle.endianness, 'middle');
+
+  const spilled = p('3 456', { range: { from: '1900-01-01', to: 'now' } });
+  assert.equal(spilled.status, 'complete');
+  assert.equal(spilled.text, '3 April 1956');
+  assert.equal(spilled.date, '1956-04-03');
+
+  const shortSpill = p('3 47');
+  assert.equal(shortSpill.status, 'complete');
+  assert.equal(shortSpill.text, '3 April 2007');
+  assert.equal(shortSpill.date, '2007-04-03');
 });
 
 test('FR-4: a trailing separator pins the run but does not join segments', () => {

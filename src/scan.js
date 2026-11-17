@@ -2,9 +2,10 @@
 //
 // A segment is a maximal run of digits or of letters. Separators — `.`, `-`,
 // `/`, `,` and non-Tab whitespace — end a segment, and so does every digit↔letter
-// transition. Separators close the run they follow; the first run keeps the
-// cut it was showing, while later runs are pinned to one part (FR-4, C32).
-// Tab is a navigation key, not content (C28).
+// transition. Separators close the run they follow; the first run keeps the cut
+// it was showing, and a later run normally supplies one part. If that leaves no
+// reading at all, later runs are retried free to fill the remaining parts
+// (FR-4, C32, C34, C35). Tab is a navigation key, not content (C28).
 
 const DIGIT = /[0-9]/;
 const LETTER = /[A-Za-z]/;

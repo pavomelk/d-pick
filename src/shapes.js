@@ -5,8 +5,11 @@
 // run is filled greedily left to right in the assumed order, and a part that
 // has taken its digits is never re-split later (C16): two digits whenever they
 // are valid, one only when two would not be — `52` is day 5 + month 2, `1225`
-// is day 12 + month 2 + year 5. Runs after a separator are pinned to one part,
-// so `25/5/2024` is 25|5|2024 and `25/345` is not a date.
+// is day 12 + month 2 + year 5. A run after a separator normally supplies one
+// part. If pinning every later run produces no reading at all, the parse is
+// retried with later runs free to fill the remaining parts, so `3 47` is 3|4|7
+// and `3 456` is 3|4|56. A valid pinned reading wins over that fallback, which
+// keeps `5/25` as May 25 rather than 5 February 2005.
 //
 // Readings that differ only by century (a short year, FR-13) or by the month a
 // letter run resolves to (FR-9) are the alternatives the list exposes.
@@ -30,17 +33,24 @@ const PART_CAP = { day: 2, month: 2, year: 4 };
 export function readingsFor(scanned, range) {
   if (!scanned.ok || scanned.empty) return [];
 
-  const readings = [];
   const firstEndianness =
     scanned.segments.length === 1
       ? null
       : preferredEndiannessFor(scanned.segments[0], range);
 
-  for (const endianness of ['little', 'middle']) {
-    const firstRunSpills = firstEndianness === null || endianness === firstEndianness;
-    readings.push(...readSegments(scanned.segments, endianness, range, firstRunSpills));
-  }
-  return readings;
+  const read = (spillLater) => {
+    const readings = [];
+    for (const endianness of ['little', 'middle']) {
+      const firstRunSpills = firstEndianness === null || endianness === firstEndianness;
+      readings.push(...readSegments(scanned.segments, endianness, range, firstRunSpills, spillLater));
+    }
+    return readings;
+  };
+
+  // Keep separators as boundaries while a single-part reading exists; only
+  // fall back to spilling when the pinned interpretation has no reading at all.
+  const pinned = read(false);
+  return pinned.length > 0 ? pinned : read(true);
 }
 
 // The run before the first separator keeps whichever reading was preferred
@@ -75,7 +85,7 @@ function validMonth(value) {
   return value >= 1 && value <= 12;
 }
 
-function readSegments(segments, endianness, range, freeFirst = true) {
+function readSegments(segments, endianness, range, freeFirst = true, spillLater = false) {
   const order = PART_ORDER[endianness];
   const spans = { day: null, month: null, year: null };
   let day = null;
@@ -98,9 +108,10 @@ function readSegments(segments, endianness, range, freeFirst = true) {
       continue;
     }
 
-    // Runs after a separator are pinned: one segment per part, however long
-    // it is. The first run may keep its free split (C32).
-    if (segmentIndex > 0 || !freeFirst) {
+    // The preferred first run keeps its free split (C32); the first run of the
+    // other endianness is pinned. Later runs spill only in the fallback pass.
+    const spills = segmentIndex === 0 ? freeFirst : spillLater;
+    if (!spills) {
       if (segment.text.length > PART_CAP[part]) return [];
       if (part === 'year') {
         yearDigits = segment.text;
@@ -118,7 +129,7 @@ function readSegments(segments, endianness, range, freeFirst = true) {
       continue;
     }
 
-    // The accepted first run fills the parts it spans.
+    // A run allowed to spill fills the parts it spans.
     let offset = 0;
     while (offset < segment.text.length) {
       if (slot >= order.length) return [];
